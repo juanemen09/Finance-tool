@@ -1,0 +1,7 @@
+.env
+.env.*
+*.cred
+__pycache__/
+data/raw/
+
+.claude/settings.local.json

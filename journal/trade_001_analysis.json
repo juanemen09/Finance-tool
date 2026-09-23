@@ -1,0 +1,65 @@
+{
+  "agent": "Claude — Quantitative Research / Risk Agent",
+  "timestamp": "2026-09-23T22:05:16Z",
+  "analysis_id": "ATL-CLAUDE-2026-09-23-001",
+  "related_trade_id": "Trade #001",
+  "assets_analyzed": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "ONDOUSDT"],
+  "timeframes": ["4h", "1h"],
+  "data_source": "Binance public REST /api/v3 (klines, ticker/24hr, exchangeInfo). Account data NOT verified: no Binance MCP in session.",
+  "market_regime": "BTC 4h uptrend under test: 12:00Z candle (~3x volume) broke last 4h higher low 85114 to 83500; price back at 4h EMA20 (~84.5k), above EMA50 (82.1k). 1h bearish: below EMA20/50 (~85.1k), RSI 37, lower highs; bounce on falling volume (RVOL 0.4). Alts sold harder and in sync (ETH -2.4%, SOL -2.8%, LINK -4.6%, ONDO -4.8% 24h); all broke their 4h swing lows.",
+  "thesis": "No edge at current prices. Every asset sits mid-range after a high-volume breakdown, with the 1h bounce on declining volume. Longs here buy into overhead resistance (broken 4h HL + 1h EMA20/50) with invalidation 1.5-3% away and first target of similar distance: ~1:1 before fees.",
+  "supporting_evidence": [
+    "BTC 4h: HL sequence 75065 -> 80126 -> 85114 broken by 83500 with 8306 BTC volume vs ~2.5k average",
+    "All five 1h: close < EMA20 < EMA50; RSI14 32.7-38.3; last 3 bars RVOL 0.28-0.49",
+    "LINK: below 4h EMA50 (12.34) and 1h EMA200 (12.31); weakest relative strength",
+    "ONDO: 4h ATR 3.95%, sitting on 4h EMA50 0.408 / 1h EMA200 0.407 with no reaction yet"
+  ],
+  "counterarguments": [
+    "4h trend across BTC/ETH/SOL is still above EMA50 and EMA200; this may be an ordinary pullback in an uptrend",
+    "Selling climax possible: volume spike + oversold 1h RSI can precede a sharp V-reversal that WAIT misses"
+  ],
+  "risk_factors": [
+    "STRUCTURAL: Binance minNotional = 5 USDT (applyMinToMarket=true) on all five pairs. A 5 USDT position that drops even slightly, or loses the fee taken in base asset, cannot be sold: stop-loss would be rejected. The 5 USDT cap is incompatible with exiting.",
+    "BTC loss of 83.5k opens 82.1k (4h EMA50) and 80.1k (prior 4h HL); alts likely to amplify"
+  ],
+  "proposed_action": "DO NOTHING",
+  "conditional_setups": [
+    {
+      "asset": "BTCUSDT",
+      "rank": 1,
+      "type": "Pullback to 4h EMA50 / prior breakout zone",
+      "entry_zone": "82000-82600, only after a 1h close back above the prior 1h low with RVOL > 1.2",
+      "invalidation": "1h close < 80900 (below 4h EMA50 and toward the 80126 HL)",
+      "targets": ["85100 (broken HL)", "87300 (4h double top)"],
+      "rr_estimate": "~2:1 to T1, ~3.5:1 to T2 from 82300"
+    },
+    {
+      "asset": "BTCUSDT",
+      "rank": 2,
+      "type": "Reclaim",
+      "entry_zone": "1h close > 85200 on RVOL > 1.2, then retest hold",
+      "invalidation": "back below 84200",
+      "targets": ["86700", "87300"],
+      "rr_estimate": "~1.5-2:1; acceptable only with the retest"
+    },
+    {
+      "asset": "ETHUSDT",
+      "rank": 3,
+      "type": "Hold of 2630-2640 (1h EMA200 + 4h EMA50 + today's low)",
+      "entry_zone": "2635-2650 after a bullish 1h reaction",
+      "invalidation": "1h close < 2600",
+      "targets": ["2715", "2789"],
+      "rr_estimate": "~1.5:1 to T1, ~3:1 to T2"
+    }
+  ],
+  "rejected": {
+    "SOLUSDT": "Mid-range (support 113 / resistance 115.5-116.2); no location edge",
+    "LINKUSDT": "Weakest structure; below 4h EMA50 and 1h EMA200 after -5.5% high-volume leg",
+    "ONDOUSDT": "Highest volatility, weakest relative strength; stop would need >4%"
+  },
+  "entry_zone_if_applicable": null,
+  "invalidation_if_applicable": null,
+  "targets_if_applicable": null,
+  "confidence_context": "High confidence in NO TRADE now. Conditional setups are watchlist only, not proposals. Account state unverified.",
+  "status": "PENDING_SUPABASE_WRITE — no AI Trading Lab Supabase project found"
+}
