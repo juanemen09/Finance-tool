@@ -158,6 +158,21 @@ def parse_long_short(payload):
                          _from_ms(row["timestamp"])) for row in payload]
 
 
+def parse_stablecoin_supply(payload, last=2):
+    """Oferta total de stablecoins en USD (DefiLlama): el dólar tokenizado que entra o sale del sistema."""
+    return [_observation("defillama", "stablecoin_supply_usd", None, row["totalCirculatingUSD"]["peggedUSD"],
+                         _utc_iso(datetime.fromtimestamp(int(row["date"]), tz=timezone.utc)))
+            for row in payload[-last:]]
+
+
+def parse_rwa_tvl(protocols, now):
+    """Total invertido en protocolos de activos del mundo real tokenizados (categoría RWA de DefiLlama).
+    DefiLlama solo da el valor actual: se guarda uno por día (el primero del día UTC)."""
+    total = sum(float(p["tvl"]) for p in protocols if p.get("category") == "RWA" and p.get("tvl"))
+    day = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    return [_observation("defillama", "rwa_tvl_usd", None, round(total, 2), _utc_iso(day))]
+
+
 def _dollar_quote(text):
     # Un literal con etiqueta aleatoria que no aparece en el texto no puede cerrarse desde dentro:
     # los titulares vienen de internet y no deben poder inyectar SQL.

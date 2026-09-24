@@ -50,6 +50,35 @@ def load_fear_greed(refresh=False):
     return parse_fear_greed_history(json.loads(raw)), hashlib.sha256(raw).hexdigest()
 
 
+STABLECOIN_URL = "https://stablecoins.llama.fi/stablecoincharts/all"
+
+
+def parse_stablecoin_history(payload):
+    return {int(row["date"]) * 1000 // DAY_MS * DAY_MS: float(row["totalCirculatingUSD"]["peggedUSD"])
+            for row in payload if row.get("totalCirculatingUSD", {}).get("peggedUSD") is not None}
+
+
+def load_stablecoin_supply(refresh=False):
+    """{día UTC: oferta total de stablecoins en USD} desde 2017 (DefiLlama, sin checksum: archivo congelado)."""
+    path = ROOT / "stablecoin_supply.json"
+    if refresh or not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(_get(STABLECOIN_URL))
+    raw = path.read_bytes()
+    return parse_stablecoin_history(json.loads(raw)), hashlib.sha256(raw).hexdigest()
+
+
+def growth_series(series, window=30, lag_days=1):
+    """Crecimiento a `window` días con `lag_days` de retraso: para la vela del día D se usa el dato de D-1 (no se
+    sabe a qué hora del día fecha DefiLlama su foto, así que no se usa la del propio día)."""
+    out = {}
+    for day in series:
+        now_day, past_day = day - lag_days * DAY_MS, day - (lag_days + window) * DAY_MS
+        if now_day in series and past_day in series and series[past_day] > 0:
+            out[day] = series[now_day] / series[past_day] - 1
+    return out
+
+
 def parse_funding_zip(raw):
     with zipfile.ZipFile(io.BytesIO(raw)) as archive:
         text = archive.open(archive.namelist()[0]).read().decode()

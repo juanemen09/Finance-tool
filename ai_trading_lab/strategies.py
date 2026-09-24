@@ -94,14 +94,20 @@ def channel_trend(bars, p):
 
 
 def channel_trend_filtered(bars, p):
-    """channel_trend que no entra cuando la multitud está eufórica: si la serie `filter` de la vela de la señal
-    (Fear & Greed del día, o funding sumado del día) es >= max_value, o falta, no hay entrada. Las salidas no
-    se filtran: salir nunca se bloquea. max_value None reproduce la estrategia base."""
+    """channel_trend con un filtro externo sobre la vela de la señal: no entra si la serie `filter` es >= max_value
+    (euforia: Fear & Greed, funding) o <= min_value (liquidez que no crece: oferta de stablecoins), ni si falta
+    el dato. Las salidas no se filtran: salir nunca se bloquea. Sin umbrales reproduce la estrategia base."""
     base = channel_trend(bars, p)
-    if p["max_value"] is None:
+    high, low = p.get("max_value"), p.get("min_value")
+    if high is None and low is None:
         return base
     feature = bars.features[p["filter"]] if bars.features else {}[p["filter"]]  # sin la serie: error, no un pase
-    entries = base.entries & (feature < p["max_value"])  # nan < x es False: sin dato no se entra
+    allowed = np.ones(len(bars), bool)
+    if high is not None:
+        allowed &= feature < high  # nan < x es False: sin dato no se entra
+    if low is not None:
+        allowed &= feature > low
+    entries = base.entries & allowed
     return Signals(entries, np.where(entries, base.stop, np.nan), base.target, exits=base.exits)
 
 

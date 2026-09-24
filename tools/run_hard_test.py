@@ -17,7 +17,9 @@ import numpy as np
 
 from ai_trading_lab import data_store
 from ai_trading_lab.backtest import Costs, run
-from ai_trading_lab.sentiment_history import attach_daily_features, daily_funding, load_fear_greed, load_funding_events
+from ai_trading_lab.sentiment_history import (
+    attach_daily_features, daily_funding, growth_series, load_fear_greed, load_funding_events, load_stablecoin_supply,
+)
 from ai_trading_lab.strategies import CATALOG
 from ai_trading_lab.validation import DEFAULT_THRESHOLDS, hard_test, incremental_test, summarize
 
@@ -48,6 +50,9 @@ def load_features(pre, bars_by_symbol, data_hashes):
     shared = {}
     if "fear_greed" in filters:
         shared["fear_greed"], data_hashes["fear_greed"] = load_fear_greed()
+    if "stablecoin_growth_30d" in filters:
+        supply, data_hashes["stablecoin_supply"] = load_stablecoin_supply()
+        shared["stablecoin_growth_30d"] = growth_series(supply, window=30, lag_days=1)
     out = {}
     for symbol, bars in bars_by_symbol.items():
         series = dict(shared)

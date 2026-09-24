@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 API = "https://export.arxiv.org/api/query"
 ATOM = {"a": "http://www.w3.org/2005/Atom"}
 CATEGORIES = ["q-fin.TR", "q-fin.PM", "q-fin.ST", "q-fin.CP"]
-DEFAULT_TERMS = ["cryptocurrency", "bitcoin", "crypto"]
+DEFAULT_TERMS = ["cryptocurrency", "bitcoin", "crypto", "tokenization", "tokenized", "real-world assets", "stablecoin"]
 
 
 def build_query(terms):

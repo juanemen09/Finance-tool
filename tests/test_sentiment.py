@@ -179,6 +179,11 @@ class CollectTest(unittest.TestCase):
             for fragment in broken:
                 if fragment in url:
                     raise TimeoutError(f"caída simulada: {fragment}")
+            if "stablecoincharts" in url:
+                return json.dumps([{"date": "1790121600", "totalCirculatingUSD": {"peggedUSD": 310e9}},
+                                   {"date": "1790208000", "totalCirculatingUSD": {"peggedUSD": 311e9}}])
+            if "api.llama.fi/protocols" in url:
+                return json.dumps([{"category": "RWA", "tvl": 4.7e9}, {"category": "Dexs", "tvl": 1e9}])
             if "alternative.me" in url:
                 return json.dumps({"data": [{"value": "71", "value_classification": "Greed", "timestamp": "1790208000"}]})
             if "fundingRate" in url:
@@ -197,9 +202,10 @@ class CollectTest(unittest.TestCase):
     def test_collects_every_source(self):
         result = collect(SINCE, fetch=self.fake_fetch())
         self.assertEqual(result["errors"], [])
-        self.assertEqual(len(result["observations"]), 1 + 5 + 5)
+        self.assertEqual(len(result["observations"]), 1 + 2 + 1 + 5 + 5)
         sources = {i["source"] for i in result["news"]}
-        self.assertEqual(sources, {"coindesk", "cointelegraph", "decrypt", "reddit_cryptocurrency", "bluesky"})
+        self.assertEqual(sources, {"coindesk", "cointelegraph", "decrypt", "reddit_cryptocurrency", "bluesky",
+                                   "oilprice", "cnbc_energy", "investing_commodities"})
 
     def test_duplicate_items_are_collapsed(self):
         # Las tres cuentas de Bluesky devuelven el mismo post en la prueba: debe quedar uno.
@@ -209,7 +215,7 @@ class CollectTest(unittest.TestCase):
     def test_a_broken_source_does_not_stop_the_rest(self):
         result = collect(SINCE, fetch=self.fake_fetch(broken=("reddit", "alternative.me")))
         self.assertEqual({e["source"] for e in result["errors"]}, {"reddit_cryptocurrency", "alternative_me"})
-        self.assertEqual(len(result["observations"]), 10)
+        self.assertEqual(len(result["observations"]), 13)
         self.assertIn("coindesk", {i["source"] for i in result["news"]})
 
     def test_summary_lists_negative_headlines(self):

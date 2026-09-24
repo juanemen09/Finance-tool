@@ -17,7 +17,8 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 from ai_trading_lab.sentiment import (
-    parse_bluesky, parse_fear_greed, parse_funding, parse_long_short, parse_rss, to_sql,
+    parse_bluesky, parse_fear_greed, parse_funding, parse_long_short, parse_rss, parse_rwa_tvl,
+    parse_stablecoin_supply, to_sql,
 )
 
 SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "ONDOUSDT"]
@@ -26,6 +27,11 @@ RSS_FEEDS = {
     "cointelegraph": "https://cointelegraph.com/rss",
     "decrypt": "https://decrypt.co/feed",
     "reddit_cryptocurrency": "https://www.reddit.com/r/CryptoCurrency/new/.rss?limit=50",
+    # Materias primas (petróleo, metales, minerales), pedido por el usuario el 2026-09-24. Mining.com y Kitco
+    # bloquean o no tienen RSS.
+    "oilprice": "https://oilprice.com/rss/main",
+    "cnbc_energy": "https://www.cnbc.com/id/19836768/device/rss/rss.html",
+    "investing_commodities": "https://www.investing.com/rss/news_11.rss",
 }
 # Cuentas verificadas el 2026-09-24: las de Cointelegraph, The Block y Blockworks no existen en Bluesky, y la de
 # CoinDesk no publica desde febrero de 2025 (su RSS sí está al día).
@@ -33,6 +39,8 @@ BLUESKY_ACCOUNTS = ["decrypt.co", "watcher.guru"]
 BLUESKY_FEED = "https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed"
 FEAR_GREED = "https://api.alternative.me/fng/?limit=2&format=json"
 FUTURES = "https://fapi.binance.com"
+STABLECOINS = "https://stablecoins.llama.fi/stablecoincharts/all"
+PROTOCOLS = "https://api.llama.fi/protocols"
 USER_AGENT = "ai-trading-lab/1.0 (personal research; hourly)"
 MAX_LOOKBACK = timedelta(hours=48)
 
@@ -53,7 +61,7 @@ def fetch_text(url, attempts=3):
             time.sleep(2 * attempt)
 
 
-def collect(since, fetch=fetch_text):
+def collect(since, fetch=fetch_text, now=None):
     observations, news, errors = [], [], []
 
     def attempt(name, fn):
@@ -63,7 +71,11 @@ def collect(since, fetch=fetch_text):
             errors.append({"source": name, "error": f"{type(exc).__name__}: {exc}"[:300]})
             return []
 
+    now = now or datetime.now(timezone.utc)
     observations += attempt("alternative_me", lambda: parse_fear_greed(json.loads(fetch(FEAR_GREED))))
+    # Tokenización: el dólar tokenizado (stablecoins) y los activos del mundo real tokenizados (RWA).
+    observations += attempt("defillama:stablecoins", lambda: parse_stablecoin_supply(json.loads(fetch(STABLECOINS))))
+    observations += attempt("defillama:rwa", lambda: parse_rwa_tvl(json.loads(fetch(PROTOCOLS)), now))
     for symbol in SYMBOLS:
         q = urllib.parse.urlencode({"symbol": symbol, "limit": 1})
         observations += attempt(f"funding:{symbol}", lambda: parse_funding(
