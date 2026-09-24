@@ -54,9 +54,9 @@ select * from v_proposal_status where status not in ('EXECUTED', 'EXPIRED') orde
 - Para pedir algo al otro agente: `insert into agent_messages (from_agent_id, to_agent_id, kind, related_ref, body, expires_at)`.
   `kind`: `REVIEW_REQUEST`, `REVIEW_DONE`, `EXECUTION_DONE`, `ALERT`, `INFO`.
 - Al atenderlo: `insert into message_acks (message_id, acked_by_agent_id, outcome)`. Solo el destinatario puede hacerlo.
-- Frecuencia: Claude revisa al cierre de cada vela de 4h (7:01, 11:01, 15:01 y 19:01 hora de Quito);
-  ChatGPT/Codex, cada hora. Por eso una propuesta de Claude se revisa en menos de 1h y una de Codex puede
-  esperar hasta 4h: ponle un `expires_at` realista.
+- Frecuencia: Claude revisa cada hora (unos minutos después del cierre de 1h); ChatGPT/Codex, cada 15
+  minutos (si no hay nada pendiente, termina sin analizar). Una propuesta se revisa en menos de 1h: ponle un
+  `expires_at` realista.
 
 ## De la propuesta a la ejecución
 
@@ -104,6 +104,22 @@ Detalle completo en `docs/plans/strategy-pipeline.md`. Lo esencial:
 - **Re-test mensual** de cada `LIVE_ELIGIBLE`; si falla, pasa a `DEGRADED` y deja de respaldar operaciones.
 - Implementar una familia nueva de estrategia es un cambio de código: se hace en una sesión supervisada,
   con pruebas, nunca desde una tarea automática.
+- **Estrategias con salida por señal** (p. ej. `channel_trend`, `tsmom`): al entrar se coloca en Binance una
+  orden stop-loss en `invalidation`; no se coloca take profit. `targets[1]` de la propuesta es solo una
+  referencia de 2R para calcular riesgo/beneficio. La salida la marca la regla de la estrategia tras el
+  cierre de su vela (por ejemplo, cierre diario por debajo del mínimo de 10 días): quien la detecte envía un
+  `ALERT` y el ejecutor vende.
+- Temporalidades y ventanas de prueba (12 meses de entrenamiento, 3 de prueba y 6 de reserva): `1h` 8760 /
+  2190 / 4380 velas; `4h` 2190 / 548 / 1095; `1d` 365 / 91 / 183. Las velas de 4h y 1d se construyen desde 1h
+  verificado y coinciden con las nativas de Binance.
+
+### Estado a 2026-09-24
+- `S-CHANNEL-1D` (canal de Donchian diario: entra si el cierre supera el máximo de 20 días, sale si cierra
+  por debajo del mínimo de 10, stop 2 ATR) pasó el hard testing completo, incluida la reserva final, y está en
+  **PAPER**. Pérdida típica por operación perdedora ≈ -8 % (≈ -0,55 USDT con 7 USDT); ~7 operaciones al año
+  con una posición. Pasa a `LIVE_ELIGIBLE` solo si el usuario lo decide.
+- Rechazadas: las tres de 1h, las de compresión (4h y 1d), y por poco el canal y el momentum de 4h (Deflated
+  Sharpe 0,71) y el momentum diario (percentil 92 frente al azar).
 
 ## Desacuerdos
 

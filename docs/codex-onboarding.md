@@ -60,8 +60,16 @@ Lee la sección "Estrategias" de `AGENTS.md`. En resumen:
 - Cuando revises una propuesta de Claude respaldada por una estrategia, verifica también que la señal
   exista en `strategy_signals` para ese ciclo y ese activo.
 
+## Primera estrategia validada en pruebas (en papel)
+`S-CHANNEL-1D`: canal de Donchian diario (entra si el cierre diario supera el máximo de 20 días, sale si
+cierra por debajo del mínimo de 10, stop inicial 2 ATR). Pasó todo el hard testing y está en PAPER; si decido
+pasarla a LIVE_ELIGIBLE, sus propuestas llegarán con `strategy_id = 'S-CHANNEL-1D'`. Al ejecutar una de ellas:
+coloca una orden stop-loss en `invalidation`, **no** coloques take profit (`targets[1]` es solo una referencia
+de 2R) y vende cuando llegue el `ALERT` de salida por la regla del canal (o si tú mismo lo detectas tras el
+cierre diario de las 00:00 UTC).
+
 ## Automatización que te pido crear
-Una tarea **cada hora, al minuto 10**, que:
+Una tarea **cada 15 minutos**, que:
 1. Revise `v_pending_messages` para `chatgpt` y `v_proposal_status`.
 2. Si no hay nada pendiente, no haga nada más (sin análisis, para ahorrar uso).
 3. Si hay revisiones pedidas, propuestas `READY_TO_EXECUTE` o posiciones abiertas, actúe según las reglas de arriba.
