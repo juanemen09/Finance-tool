@@ -10,9 +10,29 @@ from datetime import datetime, timezone
 
 import numpy as np
 
+import urllib.request
+
 from ai_trading_lab.backtest import Bars
 from ai_trading_lab.candles import closed_only, fetch_klines
+from ai_trading_lab.sentiment_history import (
+    STABLECOIN_URL, attach_daily_features, growth_series, parse_stablecoin_history,
+)
 from tools.run_hard_test import resolve
+
+
+def live_series(name):
+    """Serie externa al día para las estrategias con filtro. Se descarga fresca: el archivo congelado del hard
+    test no se toca (su hash identifica los datos de la prueba)."""
+    if name == "stablecoin_growth_30d":
+        request = urllib.request.Request(STABLECOIN_URL, headers={"User-Agent": "ai-trading-lab/1.0 (signals)"})
+        with urllib.request.urlopen(request, timeout=60) as response:
+            return growth_series(parse_stablecoin_history(json.load(response)), window=30, lag_days=1)
+    raise ValueError(f"la serie {name!r} no está disponible en vivo")
+
+
+def with_live_features(bars, params, loader=live_series):
+    name = params.get("filter")
+    return attach_daily_features(bars, {name: loader(name)}) if name else bars
 
 
 def recent_bars(symbol, interval, limit=1000):
@@ -31,6 +51,7 @@ def main():
         strategy = resolve(item["implementation_ref"])
         for symbol in item["symbols"]:
             bars, close_ms = recent_bars(symbol, item.get("bar_interval", "1h"))
+            bars = with_live_features(bars, item["params"])
             sig = strategy(bars, item["params"])
             fired = bool(sig.entries[-1])
             rows.append({

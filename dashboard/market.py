@@ -1,12 +1,15 @@
-"""Velas para el gráfico, desde la API pública de Binance (sin claves), con los niveles del canal diario."""
+"""Datos de mercado públicos para el panel: velas de Binance con el canal diario y liquidez tokenizada (DefiLlama)."""
+import json
 import math
 import re
 import threading
 import time
+import urllib.request
 
 import numpy as np
 
 from ai_trading_lab.candles import closed_only, fetch_klines
+from ai_trading_lab.sentiment_history import STABLECOIN_URL, growth_series, parse_stablecoin_history
 from ai_trading_lab.strategies import rolling_max, rolling_min
 
 UNIVERSE = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "ONDOUSDT")
@@ -58,3 +61,28 @@ class CandleCache:
         with self._lock:
             self._cache[key] = (time.monotonic(), payload)
         return payload
+
+
+def liquidity_payload(series, days=365):
+    """Oferta de stablecoins del último año y su crecimiento a 30 días (con el dato del día anterior, igual que
+    en el hard test)."""
+    growth = growth_series(series, window=30, lag_days=1)
+    recent = sorted(series)[-days:]
+    return {"supply": [{"time": d // 1000, "value": series[d]} for d in recent],
+            "growth_30d": [{"time": d // 1000, "value": growth[d]} for d in recent if d in growth]}
+
+
+class LiquidityCache:
+    SECONDS = 3600
+
+    def __init__(self, fetch=None):
+        self._fetch = fetch or (lambda: json.load(urllib.request.urlopen(urllib.request.Request(
+            STABLECOIN_URL, headers={"User-Agent": "ai-trading-lab/1.0 (dashboard)"}), timeout=30)))
+        self._lock, self._at, self._value = threading.Lock(), 0.0, None
+
+    def get(self):
+        with self._lock:
+            if self._value is None or time.monotonic() - self._at > self.SECONDS:
+                self._value = liquidity_payload(parse_stablecoin_history(self._fetch()))
+                self._at = time.monotonic()
+            return self._value

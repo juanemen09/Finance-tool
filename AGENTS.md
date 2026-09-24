@@ -115,8 +115,8 @@ Detalle completo en `docs/plans/strategy-pipeline.md`. Lo esencial:
 
 ### Estado a 2026-09-24
 - `S-CHANNEL-1D` (canal de Donchian diario: entra si el cierre supera el máximo de 20 días, sale si cierra
-  por debajo del mínimo de 10, stop 2 ATR) pasó el hard testing completo, incluida la reserva final, y está en
-  **PAPER**. Pérdida típica por operación perdedora ≈ -8 % (≈ -0,55 USDT con 7 USDT); ~7 operaciones al año
+  por debajo del mínimo de 10, stop 2 ATR) pasó el hard testing completo, incluida la reserva final, y es
+  **LIVE_ELIGIBLE** por decisión del usuario (2026-09-24). `S-CHANNEL-1D-STABLE` está en PAPER (ver tokenización). Pérdida típica por operación perdedora ≈ -8 % (≈ -0,55 USDT con 7 USDT); ~7 operaciones al año
   con una posición. Pasa a `LIVE_ELIGIBLE` solo si el usuario lo decide.
 - Rechazadas: las tres de 1h, las de compresión (4h y 1d), y por poco el canal y el momentum de 4h (Deflated
   Sharpe 0,71) y el momentum diario (percentil 92 frente al azar).
@@ -145,6 +145,21 @@ Reglas:
   codicia alta (Fear & Greed) **empeora** la estrategia (quita las mejores rupturas) y el filtro de funding alto
   no aporta. Ambos REJECTED; la reserva final no se gastó. Contra la intuición, la euforia no es aquí una señal
   para abstenerse.
+
+## Tokenización y materias primas (pedido del usuario, 2026-09-24)
+
+- **Titulares por tema:** `v_theme_news` marca `tokenizacion` (tokenización, activos del mundo real/RWA, fondos o
+  bonos tokenizados, BUIDL, Securitize, DTCC, Larry Fink) y `materias_primas` (petróleo, gas, oro, plata, cobre,
+  litio, uranio, minerales). Fuentes nuevas: OilPrice, CNBC Energy e Investing.com (materias primas).
+- **Métricas diarias (DefiLlama):** `stablecoin_supply_usd` (oferta total de stablecoins: el dólar tokenizado) y
+  `rwa_tvl_usd` (total invertido en protocolos de activos del mundo real tokenizados).
+- **ONDO y LINK** son los activos de tokenización del universo: en sus análisis se citan los titulares de este tema
+  como contexto.
+- **S-CHANNEL-1D-STABLE** (PAPER desde 2026-09-24): S-CHANNEL-1D sin entrar cuando la oferta de stablecoins cae
+  más de 1 % en 30 días. Pasó el hard testing completo, pero su mejora sobre la base es modesta (IC incluye 0;
+  percentil 96 frente a filtros de azar). Emite señales en papel; pasa a LIVE_ELIGIBLE solo si el usuario lo decide.
+- Acciones de empresas tokenizadoras o materias primas no se operan aquí (solo Spot de Binance, universo de 5
+  pares): si aparece un hallazgo, se informa al usuario y la decisión es suya.
 
 ## Autorización permanente con ventana de veto
 

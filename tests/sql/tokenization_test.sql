@@ -10,7 +10,8 @@ insert into news_items (item_key, source, title, url, published_at, sentiment, s
   ('t:3', 'cnbc_energy', 'Gold and copper rally on critical minerals deal', 'https://x/3', now(), 0, 'm', 'claude'),
   ('t:4', 'decrypt', 'Tokenized gold demand surges', 'https://x/4', now(), 0, 'm', 'claude'),
   ('t:5', 'investing_commodities', 'Bitcoin miners boil over; toilets and golden retrievers', 'https://x/5', now(), 0, 'm', 'claude'),
-  ('t:6', 'cointelegraph', 'Real-world assets onchain hit record', 'https://x/6', now(), 0, 'm', 'claude');
+  ('t:6', 'cointelegraph', 'Real-world assets onchain hit record', 'https://x/6', now(), 0, 'm', 'claude'),
+  ('t:7', 'coindesk', 'Trump administration weighs a global stablecoin plan', 'https://x/7', now(), 0, 'm', 'claude');
 
 insert into sentiment_observations (source, metric, symbol, value, observed_at, recorded_by_agent_id) values
   ('defillama', 'stablecoin_supply_usd', null, 311e9, '2099-01-01', 'claude'),
@@ -27,6 +28,8 @@ begin
   select themes into th from v_theme_news where title like 'Tokenized gold%';
   assert th = array['tokenizacion', 'materias_primas'], format('oro tokenizado tiene los dos temas: %s', th);
   assert exists (select 1 from v_theme_news where title like 'Real-world%'), 'activos del mundo real es tokenización';
+  select themes into th from v_theme_news where title like 'Trump administration%';
+  assert th = array['tokenizacion'], format('las stablecoins son dólares tokenizados: %s', th);
   -- "boil", "toilets" y "golden" no son petróleo ni oro: los límites de palabra evitan falsos positivos.
   assert not exists (select 1 from v_theme_news where title like 'Bitcoin miners%'), 'falso positivo por subcadena';
   assert not has_table_privilege('anon', 'public.v_theme_news', 'select'), 'anon no debe leer la vista';

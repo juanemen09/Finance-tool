@@ -80,5 +80,24 @@ class MinValueFilterTest(unittest.TestCase):
         self.assertEqual(lookahead_violations(channel_trend_filtered, b, p, range(100, 3000, 101)), [])
 
 
+class LiveSignalFeaturesTest(unittest.TestCase):
+    def test_filtered_strategy_gets_its_series(self):
+        from tools.strategy_signals import with_live_features
+        days = np.array([D0 + k * DAY_MS for k in range(60)], dtype=np.int64)
+        closes = np.linspace(100, 160, 60)
+        b = Bars(days, closes, closes + 1, closes - 1, closes, np.ones(60))
+        loader = lambda name: {int(d): 0.02 for d in days[5:]}
+        p = {**BASE, "filter": "stablecoin_growth_30d", "min_value": -0.01}
+        out = with_live_features(b, p, loader=loader)
+        self.assertEqual(len(out), 55)
+        sig = channel_trend_filtered(out, p)  # sin la serie lanzaría KeyError
+        self.assertTrue(sig.entries[-1])  # ruptura continua y liquidez creciendo: hay entrada
+
+    def test_unfiltered_strategy_is_untouched(self):
+        from tools.strategy_signals import with_live_features
+        b = random_walk(50, np.random.default_rng(1))
+        self.assertIs(with_live_features(b, BASE, loader=None), b)
+
+
 if __name__ == "__main__":
     unittest.main()

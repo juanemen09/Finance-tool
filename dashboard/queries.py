@@ -40,6 +40,10 @@ SQL = {
     "tone": "select * from v_news_sentiment_24h order by items desc",
     "news": "select source, author, title, url, published_at, symbols, sentiment from news_items "
             "order by published_at desc limit 25",
+    "themes": "select source, author, title, url, published_at, themes, sentiment from v_theme_news "
+              "order by published_at desc limit 20",
+    "rwa": "select value, observed_at from sentiment_observations where metric = 'rwa_tvl_usd' "
+           "order by observed_at desc limit 60",
     "research": "select source, title, url, own_summary, created_at from strategy_sources order by id desc limit 8",
     "equity": "select observed_at, balances from portfolio_snapshots order by observed_at limit 2000",
     "timeline": "select * from ("
@@ -130,6 +134,8 @@ def build_state(run_query, now):
         "sentiment": {"latest": q["sentiment"], "tone_24h": q["tone"]},
         "news": q["news"],
         "research": q["research"],
+        "themes": q["themes"],
+        "rwa": q["rwa"],
         "equity": equity_curve(q["equity"]),
         "timeline": q["timeline"],
     }

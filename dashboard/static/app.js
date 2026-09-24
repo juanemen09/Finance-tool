@@ -294,6 +294,55 @@
     }));
   }
 
+  const THEME_NAMES = { tokenizacion: "tokenización", materias_primas: "materias primas" };
+  let liqChart = null, liqSeries = null;
+
+  function renderThemes() {
+    const items = state.themes || [];
+    if (!items.length) { fill("themes", h("li", { class: "empty", text: "Aún no hay titulares de estos temas." })); return; }
+    fill("themes", items.map((n) => {
+      const url = safeUrl(n.url);
+      const title = url ? h("a", { href: url, target: "_blank", rel: "noopener noreferrer", text: n.title }) : h("span", { text: n.title });
+      const cls = n.sentiment <= -0.3 ? "neg" : n.sentiment >= 0.3 ? "pos" : "";
+      return h("li", {}, h("span", { class: `tone ${cls}` }),
+        h("div", {}, n.themes.map((t) => h("span", { class: `badge theme ${t}`, text: THEME_NAMES[t] || t })), title,
+          h("div", { class: "meta", text: `${n.author || n.source} · ${ago(n.published_at)}` })));
+    }));
+  }
+
+  async function renderLiquidity() {
+    try {
+      const data = await getJSON("/api/liquidity");
+      const supply = data.supply, growth = data.growth_30d;
+      const last = supply[supply.length - 1], g = growth[growth.length - 1];
+      const rwa = (state?.rwa || [])[0];
+      const box = h("div", { class: "liq-chart", id: "liq-chart" });
+      fill("liquidity",
+        h("div", { class: "liq-stats" },
+          h("div", {}, h("div", { class: "sub", text: "Oferta de stablecoins (dólar tokenizado)" }),
+            h("div", { class: "big", text: last ? `${num(last.value / 1e9, 1)} mil M` : "—" })),
+          h("div", {}, h("div", { class: "sub", text: "Crecimiento 30 días" }),
+            h("div", { class: `big ${g && g.value > 0 ? "tone-pos" : "tone-neg"}`, text: g ? `${g.value > 0 ? "+" : ""}${num(g.value * 100, 2)} %` : "—" })),
+          h("div", {}, h("div", { class: "sub", text: "Activos del mundo real tokenizados" }),
+            h("div", { class: "big", text: rwa ? `${num(rwa.value / 1e9, 2)} mil M` : "—" }))),
+        box,
+        h("p", { class: "sub", text: "Fuente: DefiLlama. Liquidez entrando = más dólares tokenizados disponibles para comprar cripto." }));
+      const LWC = window.LightweightCharts;
+      liqChart = LWC.createChart(box, {
+        layout: { background: { type: "solid", color: "transparent" }, textColor: "#9aa8cf" },
+        grid: { vertLines: { visible: false }, horzLines: { color: "rgba(130,160,255,0.06)" } },
+        rightPriceScale: { borderVisible: false }, timeScale: { borderVisible: false }, autoSize: true,
+        handleScroll: false, handleScale: false,
+      });
+      liqSeries = liqChart.addAreaSeries({ lineColor: "#6fd3ff", topColor: "rgba(111,211,255,0.35)", bottomColor: "rgba(111,211,255,0)", lineWidth: 2,
+        priceFormat: { type: "custom", formatter: (v) => `${(v / 1e9).toFixed(0)} mil M` } });
+      liqSeries.setData(supply);
+      liqChart.timeScale().fitContent();
+    } catch (e) {
+      fill("liquidity", h("p", { class: "empty", text: `Liquidez no disponible: ${e.message}` }));
+    }
+  }
+
   // ---------------------------------------------------------------- gráfico
   let chart = null, candleSeries = null, volumeSeries = null, entryLine = null, exitLine = null, priceLines = [];
 
@@ -362,7 +411,7 @@
   async function refresh() {
     try {
       state = await getJSON("/api/state");
-      for (const fn of [renderStatus, renderAlerts, renderAccount, renderDuel, renderProposal, renderTimeline, renderStrategies, renderSentiment, renderNews, renderResearch]) {
+      for (const fn of [renderStatus, renderAlerts, renderAccount, renderDuel, renderProposal, renderTimeline, renderStrategies, renderSentiment, renderNews, renderResearch, renderThemes]) {
         try { fn(); } catch (e) { console.error(fn.name, e); }
       }
       $("updated").textContent = `Actualizado ${quitoFmt.format(new Date())} (Quito) · se refresca cada 30 s`;
@@ -374,7 +423,8 @@
   tick();
   setInterval(tick, 1000);
   initChart();
-  refresh().then(() => { loadChart(); renderRadar(); });
+  refresh().then(() => { loadChart(); renderRadar(); renderLiquidity(); });
+  setInterval(renderLiquidity, 3_600_000);
   setInterval(refresh, 30_000);
   setInterval(() => { loadChart(); renderRadar(); }, 120_000);
 })();

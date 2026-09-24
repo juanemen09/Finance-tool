@@ -8,7 +8,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from dashboard.config import load_env
-from dashboard.market import MarketError, candles_payload, validate_candles_request
+from dashboard.market import MarketError, candles_payload, liquidity_payload, validate_candles_request
 from dashboard.queries import agent_health, build_state, equity_curve, next_daily_close, to_jsonable
 from dashboard.server import make_server
 
@@ -99,11 +99,23 @@ class MarketTest(unittest.TestCase):
         self.assertEqual(payload["channel"][25]["exit_level"], min(99 + i for i in range(15, 25)))
 
 
+class LiquidityTest(unittest.TestCase):
+    def test_growth_lags_one_day(self):
+        day = 86_400_000
+        series = {k * day: 100.0 + k for k in range(40)}
+        payload = liquidity_payload(series, days=40)
+        self.assertEqual(len(payload["supply"]), 40)
+        last = payload["growth_30d"][-1]
+        self.assertEqual(last["time"], 39 * day // 1000)
+        self.assertAlmostEqual(last["value"], (100.0 + 38) / (100.0 + 8) - 1)
+
+
 class ServerTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.server = make_server(0, state_provider=lambda: {"ok": True},
-                                 candles_provider=lambda s, i: {"symbol": s, "interval": i, "candles": []})
+                                 candles_provider=lambda s, i: {"symbol": s, "interval": i, "candles": []},
+                                 liquidity_provider=lambda: {"supply": [], "growth_30d": []})
         cls.port = cls.server.server_address[1]
         threading.Thread(target=cls.server.serve_forever, daemon=True).start()
 
@@ -152,6 +164,10 @@ class ServerTest(unittest.TestCase):
         for path in ["/static/../../.env", "/static/..%2F..%2F.env", "/.env", "/static/nope.js"]:
             status, _, _ = self.get(path)
             self.assertEqual(status, 404, path)
+
+    def test_liquidity_endpoint(self):
+        status, _, body = self.get("/api/liquidity")
+        self.assertEqual((status, json.loads(body)), (200, {"supply": [], "growth_30d": []}))
 
     def test_candles_validation(self):
         self.assertEqual(self.get("/api/candles?symbol=BTCUSDT&interval=1d")[0], 200)
