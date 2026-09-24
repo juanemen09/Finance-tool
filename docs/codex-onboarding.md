@@ -68,6 +68,15 @@ coloca una orden stop-loss en `invalidation`, **no** coloques take profit (`targ
 de 2R) y vende cuando llegue el `ALERT` de salida por la regla del canal (o si tú mismo lo detectas tras el
 cierre diario de las 00:00 UTC).
 
+## Aprobación automática con 15 minutos de veto (activa desde 2026-09-24)
+Lee la sección "Autorización permanente con ventana de veto" de `AGENTS.md`. Resumen: una propuesta de una
+estrategia LIVE_ELIGIBLE, aprobada por el otro agente, pasa a ejecutable sin mi "autorizo" si pasan 15 minutos
+sin veto y cumple los límites de riesgo (pérdida ≤ 0,8 USDT, relación ≥ 1,5, pérdidas semanales > -1 USDT).
+Tú **no decides** si aplica: consulta `select auto_authorization_status('<proposal_id>', now())` y
+`v_executable_proposals`; solo ejecuta si la propuesta aparece ahí. Si te escribo "veto P-…", inserta en
+`user_vetoes` al momento. Mientras siga abierta la alerta `permissions_review` (tus permisos de margen y
+transferencia en Binance), la aprobación automática está bloqueada: recuérdame reconectarte.
+
 ## Automatización que te pido crear
 Una tarea **cada 15 minutos**, que:
 1. Revise `v_pending_messages` para `chatgpt` y `v_proposal_status`.

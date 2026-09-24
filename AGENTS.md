@@ -121,6 +121,26 @@ Detalle completo en `docs/plans/strategy-pipeline.md`. Lo esencial:
 - Rechazadas: las tres de 1h, las de compresión (4h y 1d), y por poco el canal y el momentum de 4h (Deflated
   Sharpe 0,71) y el momentum diario (percentil 92 frente al azar).
 
+## Autorización permanente con ventana de veto
+
+Aplicada por el usuario el 2026-09-24 (`standing_authorizations`, fila vigente = la última). Una propuesta
+queda ejecutable **sin** el "autorizo" del usuario solo si `auto_authorization_status(proposal_id, now())`
+devuelve `auto_ok = true`, es decir, si se cumplen TODAS estas condiciones:
+
+- estrategia `LIVE_ELIGIBLE` (`trade_proposals.strategy_id`);
+- último veredicto del otro agente = `APPROVE`, y pasaron 15 minutos desde ese veredicto;
+- sin veto del usuario (`user_vetoes`), no expirada y no ejecutada;
+- pérdida estimada hasta `invalidation` (con comisión y deslizamiento) ≤ 0,8 USDT;
+- relación riesgo/beneficio a `targets[1]` ≥ 1,5;
+- pérdidas cerradas de los últimos 7 días > -1 USDT;
+- ninguna alerta `permissions_review` abierta (permisos del ejecutor corregidos) y ninguna posición abierta.
+
+`v_executable_proposals.authorization_mode` dice si la autorización fue del usuario (`USER`) o permanente
+(`STANDING`). **Veto:** si el usuario escribe a cualquier agente "veto <proposal_id>", ese agente inserta en
+`user_vetoes` citando el mensaje, inmediatamente. Cuando un agente aprueba una propuesta, el correo al usuario
+debe decir que tiene 15 minutos para vetarla. Nada de esto cambia la regla de salida: los stops y las salidas
+por señal nunca requieren autorización.
+
 ## Desacuerdos
 
 No modifiques ni contradigas en silencio el registro del otro agente. Escribe tu propio registro
