@@ -3,7 +3,8 @@
 Todas las fuentes son gratuitas y públicas. Una fuente caída no detiene a las demás: queda en `errors`.
 Con --sql imprime un único script para execute_sql (duplicados ignorados) y deja el resumen en stderr.
 
-Uso:  python -m tools.ingest_sentiment [--since 2026-09-24T03:00:00Z] [--sql] [--agent claude]
+Uso:  python -m tools.ingest_sentiment --since 2026-09-24T03:00:00Z --insert   (inserta con el rol lab_ingest del .env)
+      python -m tools.ingest_sentiment [--since 2026-09-24T03:00:00Z] [--sql] [--agent claude]
       python -m tools.ingest_sentiment --since ... --out data/raw/sentiment.sql --summary data/raw/sentiment_summary.json
 """
 import argparse
@@ -16,11 +17,12 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-from ai_trading_lab.sentiment_history import growth_series, parse_stablecoin_history
 from ai_trading_lab.sentiment import (
     parse_bluesky, parse_fear_greed, parse_funding, parse_long_short, parse_rss, parse_rwa_tvl,
-    parse_stablecoin_supply, to_sql,
+    parse_stablecoin_supply, to_sql, to_sql_statements,
 )
+from ai_trading_lab.sentiment_history import growth_series, parse_stablecoin_history
+from dashboard.config import load_env
 
 SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "ONDOUSDT"]
 RSS_FEEDS = {
@@ -121,6 +123,16 @@ def summarize(result):
     }
 
 
+def insert_direct(connect, result, agent_id):
+    """Inserta con el rol lab_ingest (solo INSERT en las dos tablas de sentimiento). Así el agente no copia los
+    titulares en su respuesta: era la parte más cara de cada ciclo."""
+    with connect() as conn:
+        counts = [conn.execute(sql).rowcount for sql in
+                  to_sql_statements(result["observations"], result["news"], agent_id)]
+    names = (["observations"] if result["observations"] else []) + (["news"] if result["news"] else [])
+    return dict(zip(names, counts))
+
+
 def parse_since(text, now):
     since = datetime.fromisoformat(text.replace("Z", "+00:00")) if text else now - timedelta(hours=6)
     if since.tzinfo is None:
@@ -136,6 +148,8 @@ def main():
     # Escribir los archivos desde Python evita la redirección de la consola: en PowerShell 5.1, `>` guarda UTF-16.
     parser.add_argument("--out", help="archivo donde escribir el script SQL (UTF-8)")
     parser.add_argument("--summary", help="archivo donde escribir el resumen JSON (UTF-8)")
+    parser.add_argument("--insert", action="store_true",
+                        help="inserta directo con INGEST_DATABASE_URL (rol lab_ingest) e imprime solo el resumen")
     args = parser.parse_args()
     # En Windows la consola usa cp1252: las comillas tipográficas de los titulares llegaban como '?'.
     sys.stdout.reconfigure(encoding="utf-8")
@@ -144,7 +158,15 @@ def main():
     since = parse_since(args.since, datetime.now(timezone.utc))
     result = collect(since)
     summary = summarize(result)
-    if args.out or args.summary:
+    if args.insert:
+        url = load_env().get("INGEST_DATABASE_URL", "")
+        if "lab_ingest" not in url:
+            sys.exit("Falta INGEST_DATABASE_URL con el rol lab_ingest en .env: usa --out y execute_sql.")
+        import psycopg
+        inserted = insert_direct(lambda: psycopg.connect(url, autocommit=True, prepare_threshold=None,
+                                                         connect_timeout=15), result, args.agent)
+        print(json.dumps({"inserted": inserted, **summary}, ensure_ascii=False))
+    elif args.out or args.summary:
         if args.out:
             with open(args.out, "w", encoding="utf-8") as f:
                 f.write(to_sql(result["observations"], result["news"], agent_id=args.agent) + "\n")

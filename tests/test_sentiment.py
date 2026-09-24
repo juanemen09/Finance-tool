@@ -3,7 +3,7 @@ import re
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from tools.ingest_sentiment import collect, parse_since, summarize
+from tools.ingest_sentiment import collect, insert_direct, parse_since, summarize
 from ai_trading_lab.sentiment import (
     MODEL_VERSION, news_item, parse_bluesky, parse_fear_greed, parse_funding, parse_long_short, parse_rss, score,
     tag_symbols, to_sql,
@@ -233,6 +233,29 @@ class CollectTest(unittest.TestCase):
         self.assertEqual(parse_since("2020-01-01T00:00:00Z", NOW), NOW - timedelta(hours=48))
         self.assertEqual(parse_since(None, NOW), NOW - timedelta(hours=6))
         self.assertEqual(parse_since("2026-09-24T04:00:00Z", NOW), datetime(2026, 9, 24, 4, tzinfo=timezone.utc))
+
+
+class InsertDirectTest(unittest.TestCase):
+    def test_runs_each_statement_and_reports_rowcounts(self):
+        executed = []
+
+        class Conn:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def execute(self, sql):
+                executed.append(sql)
+                return type("Cursor", (), {"rowcount": 3 if "news_items" in sql else 1})()
+
+        obs = parse_fear_greed({"data": [{"value": "71", "timestamp": "1790208000"}]})
+        news = parse_rss("coindesk", RSS, since=SINCE)
+        counts = insert_direct(Conn, {"observations": obs, "news": news}, "claude")
+        self.assertEqual(counts, {"observations": 1, "news": 3})
+        self.assertEqual(len(executed), 2)
+        self.assertTrue(all("on conflict do nothing" in sql for sql in executed))
 
 
 if __name__ == "__main__":

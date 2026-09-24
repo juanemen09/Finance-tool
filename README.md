@@ -44,6 +44,16 @@ Configuración (una vez):
 
 La contraseña nunca se escribe en el chat ni en el repositorio.
 
+### Ingesta directa del recolector (ahorra uso)
+
+El ciclo horario inserta los titulares con un rol que solo puede **añadir** filas en `news_items` y
+`sentiment_observations` (no lee ni modifica nada más):
+
+1. En el SQL Editor: `alter role lab_ingest with login password 'OTRA_CONTRASEÑA';` (distinta de la del panel).
+2. En `.env`: `INGEST_DATABASE_URL=postgresql://lab_ingest.arxdfgphjybdxgdpqmkh:OTRA_CONTRASEÑA@aws-0-us-east-2.pooler.supabase.com:5432/postgres`
+
+Sin esa línea, el recolector sigue funcionando en el modo anterior (genera el SQL para que lo ejecute el agente).
+
 ## Pruebas
 
 ```bash

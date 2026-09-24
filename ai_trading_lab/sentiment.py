@@ -184,6 +184,10 @@ def _dollar_quote(text):
 
 def to_sql(observations, news, agent_id):
     """Un único script para execute_sql; los duplicados (misma fuente y momento, mismo item_key) se ignoran."""
+    return "\n".join(to_sql_statements(observations, news, agent_id))
+
+
+def to_sql_statements(observations, news, agent_id):
     if not AGENT_ID.match(agent_id):
         raise ValueError(f"agent_id no válido: {agent_id!r}")
     statements = []
@@ -207,4 +211,4 @@ def to_sql(observations, news, agent_id):
             "url text, published_at timestamptz, symbols text[], sentiment numeric, sentiment_model text)\n"
             "on conflict do nothing;"
         )
-    return "\n".join(statements)
+    return statements
