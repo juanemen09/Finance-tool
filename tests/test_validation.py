@@ -50,6 +50,21 @@ class StatsTest(unittest.TestCase):
         self.assertEqual(plateau_fraction(means, {"a": 1, "b": 1}), 0.5)
 
 
+class ChronologyTest(unittest.TestCase):
+    def test_pooled_returns_follow_entry_time_across_symbols(self):
+        from ai_trading_lab.backtest import Trade
+        from ai_trading_lab.validation import chronological_returns
+        from tests.synthetic import bars as make_bars
+
+        b = make_bars(*[(100, 101, 99, 100)] * 10)
+
+        def trade(entry_idx, ret):
+            return Trade(entry_idx - 1, entry_idx, entry_idx + 1, 100, 100, "TIME", ret, ret, 0, 0)
+
+        trades = {"A": [trade(2, 0.01), trade(8, 0.03)], "B": [trade(5, 0.02)]}
+        self.assertEqual(chronological_returns(trades, {"A": b, "B": b}), [0.01, 0.02, 0.03])
+
+
 class CalibrationTest(unittest.TestCase):
     """La prueba de que el test sirve: rechaza el azar y detecta un edge real."""
 

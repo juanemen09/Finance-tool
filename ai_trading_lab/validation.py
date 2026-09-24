@@ -174,8 +174,9 @@ def hard_test(strategy, param_grid, bars_by_symbol, *, costs=Costs(), holdout_ba
             oos_trades_2x[s] += run(b, sig, costs.scaled(2), (te0, te1))
             oos_windows[s].append((te0, te1))
 
-    oos = np.array([t.net_return for ts in oos_trades.values() for t in ts])
-    oos_2x = np.array([t.net_return for ts in oos_trades_2x.values() for t in ts])
+    # Orden cronológico entre activos: la curva de capital y el drawdown solo tienen sentido en el tiempo.
+    oos = np.array(chronological_returns(oos_trades, bars_by_symbol))
+    oos_2x = np.array(chronological_returns(oos_trades_2x, bars_by_symbol))
     favorite = dict(chosen.most_common(1)[0][0]) if chosen else param_grid[0]
     n_trials = n_trials_total or len(param_grid)
 
@@ -231,6 +232,13 @@ def hard_test(strategy, param_grid, bars_by_symbol, *, costs=Costs(), holdout_ba
         "checks": checks,
         "costs": {"fee_rate": costs.fee_rate, "slippage": costs.slippage},
     }
+
+
+def chronological_returns(trades_by_symbol, bars_by_symbol):
+    """Retornos netos de todos los activos ordenados por hora de entrada."""
+    timed = [(int(bars_by_symbol[s].open_time[t.entry_idx]), t.net_return)
+             for s, trades in trades_by_symbol.items() for t in trades]
+    return [r for _, r in sorted(timed, key=lambda x: x[0])]
 
 
 def _yearly_means(trades_by_symbol, bars_by_symbol, min_trades=10):

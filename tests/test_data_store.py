@@ -53,6 +53,19 @@ class DataStoreTest(unittest.TestCase):
             self.assertIsNone(data_store._month_file("ONDOUSDT", "1h", 2019, 1))
         self.assertEqual(len(calls), 1, "el segundo intento no debe volver a pedir el mes inexistente")
 
+    def test_hash_depends_on_data_not_on_query_time(self):
+        from datetime import datetime, timezone
+        from ai_trading_lab.candles import Candle
+        candles = [Candle(1_790_208_000_000 + i * 3_600_000, 1_790_208_000_000 + (i + 1) * 3_600_000 - 1,
+                          100, 101, 99, 100.5, 1) for i in range(3)]
+        early = datetime(2026, 9, 24, 3, 5, tzinfo=timezone.utc)
+        later = datetime(2026, 9, 24, 3, 40, tzinfo=timezone.utc)  # mismas velas cerradas, otra hora de consulta
+        with mock.patch.object(data_store, "_month_file", return_value=None), \
+                mock.patch.object(data_store, "fetch_klines", return_value=candles):
+            _, h1 = data_store.load("BTCUSDT", since=early.date(), now=early)
+            _, h2 = data_store.load("BTCUSDT", since=early.date(), now=later)
+        self.assertEqual(h1, h2)
+
     def test_normalizes_microsecond_timestamps(self):
         with TemporaryDirectory() as tmp:
             path = Path(tmp) / "x.zip"

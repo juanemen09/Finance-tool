@@ -94,15 +94,18 @@ def load(symbol, interval="1h", since=date(2017, 8, 1), now=None):
     # Mes en curso: API pública, solo velas cerradas.
     start_ms = int(datetime(now.year, now.month, 1, tzinfo=timezone.utc).timestamp() * 1000)
     now_ms = int(now.timestamp() * 1000)
+    api_rows = []
     while True:
         batch = fetch_klines(symbol, interval, limit=1000, start_ms=start_ms)
         closed = [c for c in batch if c.close_time <= now_ms]
         for c in closed:
             rows[c.open_time] = (c.open_time, c.open, c.high, c.low, c.close, c.volume)
+            api_rows.append(rows[c.open_time])
         if len(batch) < 1000 or not closed:
             break
         start_ms = closed[-1].open_time + 1
-    digests.append(f"api:{symbol}:{interval}:{start_ms}-{now_ms}:{len(rows)}")
+    # El hash describe el contenido, no la hora de la consulta: mismas velas, mismo hash.
+    digests.append(f"api:{symbol}:{interval}:{hashlib.sha256(repr(sorted(set(api_rows))).encode()).hexdigest()}")
 
     a = np.array([rows[k] for k in sorted(rows)], float)
     bars = Bars(a[:, 0].astype(np.int64), a[:, 1], a[:, 2], a[:, 3], a[:, 4], a[:, 5])
