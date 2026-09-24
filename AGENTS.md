@@ -54,9 +54,10 @@ select * from v_proposal_status where status not in ('EXECUTED', 'EXPIRED') orde
 - Para pedir algo al otro agente: `insert into agent_messages (from_agent_id, to_agent_id, kind, related_ref, body, expires_at)`.
   `kind`: `REVIEW_REQUEST`, `REVIEW_DONE`, `EXECUTION_DONE`, `ALERT`, `INFO`.
 - Al atenderlo: `insert into message_acks (message_id, acked_by_agent_id, outcome)`. Solo el destinatario puede hacerlo.
-- Frecuencia: Claude revisa cada hora (unos minutos después del cierre de 1h); ChatGPT/Codex, cada 15
-  minutos (si no hay nada pendiente, termina sin analizar). Una propuesta se revisa en menos de 1h: ponle un
-  `expires_at` realista.
+- Frecuencia: Claude revisa cada hora (minuto :06, tras el cierre de 1h). ChatGPT/Codex, una vez por hora al
+  minuto :15 y además cada 15 minutos de 00:15 a 01:45 UTC (19:15-20:45 en Quito), la ventana tras el cierre diario
+  donde nacen propuestas, revisiones, vetos y ejecuciones. Si no hay nada pendiente y su análisis del ciclo ya
+  existe, termina sin analizar. Una propuesta se revisa en menos de 1h: ponle un `expires_at` realista.
 
 ## De la propuesta a la ejecución
 

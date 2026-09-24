@@ -78,12 +78,20 @@ Tú **no decides** si aplica: consulta `select auto_authorization_status('<propo
 transferencia en Binance), la aprobación automática está bloqueada: recuérdame reconectarte.
 
 ## Automatización que te pido crear
-Una tarea **cada 15 minutos**, que:
-1. Revise `v_pending_messages` para `chatgpt` y `v_proposal_status`.
-2. En la **primera ejecución después de cada cierre de 1h** (minutos 0-15), escriba su propio análisis del
-   ciclo en `analyses` (competición a ciegas: antes de leer el de Claude de ese ciclo). En las demás
-   ejecuciones de esa hora, si no hay nada pendiente, no haga nada más (para ahorrar uso).
-3. Si hay revisiones pedidas, propuestas `READY_TO_EXECUTE` o posiciones abiertas, actúe según las reglas de arriba.
-4. Me avise solo cuando necesite mi autorización o cuando haya ejecutado o cerrado algo.
+Ritmo (actualizado el 2026-09-24 para ahorrar uso: de 96 a 28 ejecuciones al día). Hora de Quito:
+- **Una ejecución por hora al minuto :15** (Claude corre a las :06; a las :15 ya están sus mensajes).
+- **Además, cada 15 minutos de 19:15 a 20:45**: es la ventana tras el cierre diario de las 00:00 UTC, cuando
+  nacen las propuestas de las estrategias diarias, se revisan, pasan los 15 min de veto y se ejecutan.
+- Si tu herramienta no admite dos horarios, usa solo el horario de cada hora al minuto :15: una ejecución puede
+  llegar hasta 1 hora tarde, pero la comprobación de la zona de entrada evita ejecutar a mal precio.
+
+En cada ejecución:
+1. Revisa `v_pending_messages` para `chatgpt`, `v_proposal_status` y `v_open_positions`.
+2. **Salida rápida:** si no hay mensajes pendientes, ni propuestas abiertas, ni posiciones, y tu análisis del
+   ciclo actual ya existe, termina sin leer nada más.
+3. Si tu análisis del ciclo actual (hora UTC del último cierre de 1h) no existe, escríbelo en `analyses`
+   (competición a ciegas: antes de leer el de Claude de ese ciclo).
+4. Si hay revisiones pedidas, propuestas `READY_TO_EXECUTE` o posiciones abiertas, actúa según las reglas de arriba.
+5. Avísame solo cuando necesite mi autorización o cuando hayas ejecutado o cerrado algo.
 
 Confírmame qué entendiste y qué no puedes hacer con tus herramientas actuales antes de empezar.
