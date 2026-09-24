@@ -23,8 +23,26 @@ El protocolo entre agentes está en [AGENTS.md](AGENTS.md).
 | `tools/strategy_signals.py` | Señal actual de las estrategias en papel o validadas. |
 | `ai_trading_lab/sentiment.py` | Sentimiento: parseo de Fear & Greed, funding, largo/corto, RSS y Bluesky; tono con VADER + léxico cripto. |
 | `tools/ingest_sentiment.py` | Recolector horario de sentimiento y titulares; genera el SQL de inserción. |
+| `dashboard/` | Centro de mando local: servidor de solo lectura en 127.0.0.1 y la interfaz. |
 | `docs/plans/strategy-pipeline.md` | Protocolo del pipeline de estrategias. |
 | `tests/` | Pruebas unitarias (Python) y de comportamiento del esquema (SQL). |
+
+## Centro de mando (local, solo lectura)
+
+Panel personal en `http://127.0.0.1:8765`: cuenta, gráfico de velas con el canal de S-CHANNEL-1D, Claude frente a
+Codex, propuesta activa con sus condiciones, radar de rupturas, línea de tiempo, estrategias, sentimiento, titulares e
+investigación. Solo escucha en tu PC y usa un rol de base de datos que no puede escribir nada.
+
+Configuración (una vez):
+
+1. En Supabase → SQL Editor, dale contraseña al rol de solo lectura (elígela tú; usa solo letras y números, larga):
+   `alter role dashboard_reader with login password 'TU_CONTRASEÑA';`
+2. En Supabase → **Connect** → **Session pooler**, copia el host (algo como `aws-…-us-east-2.pooler.supabase.com`).
+3. En el archivo `.env` de esta carpeta (git lo ignora) añade una línea:
+   `DASHBOARD_DATABASE_URL=postgresql://dashboard_reader.arxdfgphjybdxgdpqmkh:TU_CONTRASEÑA@HOST:5432/postgres`
+4. `pip install -r requirements.txt` y luego `python -m dashboard` (abre el navegador solo).
+
+La contraseña nunca se escribe en el chat ni en el repositorio.
 
 ## Pruebas
 

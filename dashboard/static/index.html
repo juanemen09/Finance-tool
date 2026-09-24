@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Centro de mando · AI Trading Lab</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <canvas id="lava" aria-hidden="true"></canvas>
+  <div class="shell">
+    <header class="top glass">
+      <div class="brand">
+        <span class="core" aria-hidden="true"></span>
+        <div>
+          <h1>AI TRADING LAB</h1>
+          <p>Centro de mando · solo lectura</p>
+        </div>
+      </div>
+      <div class="clocks">
+        <div><span class="k">UTC</span><b id="clock-utc">--:--:--</b></div>
+        <div><span class="k">Quito</span><b id="clock-quito">--:--:--</b></div>
+        <div><span class="k">Cierre diario en</span><b id="countdown">--:--:--</b></div>
+      </div>
+      <div class="agents-status" id="agent-status"></div>
+    </header>
+
+    <section class="alerts" id="alerts" hidden></section>
+
+    <main class="grid">
+      <section class="glass card account">
+        <h2>Cuenta</h2>
+        <div id="account"></div>
+      </section>
+
+      <section class="glass card chart-card">
+        <div class="card-head">
+          <h2>Mercado</h2>
+          <div class="tabs" id="symbol-tabs" role="tablist" aria-label="Activo"></div>
+          <div class="tabs" id="interval-tabs" role="tablist" aria-label="Temporalidad"></div>
+        </div>
+        <div id="chart" class="chart"></div>
+        <p class="legend" id="chart-legend"></p>
+      </section>
+
+      <section class="glass card duel">
+        <h2>Claude vs Codex</h2>
+        <div id="duel" class="duel-grid"></div>
+      </section>
+
+      <section class="glass card proposal">
+        <h2>Propuesta y radar</h2>
+        <div id="proposal"></div>
+        <div id="radar"></div>
+      </section>
+
+      <section class="glass card timeline-card">
+        <h2>Línea de tiempo</h2>
+        <ol id="timeline" class="timeline"></ol>
+      </section>
+
+      <section class="glass card strategies">
+        <h2>Estrategias</h2>
+        <div id="funnel" class="funnel"></div>
+        <ul id="strategy-list" class="strategy-list"></ul>
+      </section>
+
+      <section class="glass card sentiment">
+        <h2>Sentimiento <small>contexto, no señal validada</small></h2>
+        <div id="sentiment"></div>
+      </section>
+
+      <section class="glass card news-card">
+        <h2>Titulares</h2>
+        <ul id="news" class="news"></ul>
+      </section>
+
+      <section class="glass card research">
+        <h2>Investigación</h2>
+        <ul id="research" class="research-list"></ul>
+      </section>
+    </main>
+
+    <footer>
+      <span id="updated">Conectando…</span>
+      <span>Datos: Binance (API pública), Supabase (diario), alternative.me, medios por RSS, Reddit y Bluesky.</span>
+      <span>Gráficos: <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView Lightweight Charts™</a></span>
+    </footer>
+  </div>
+  <script src="/static/vendor/lightweight-charts.js"></script>
+  <script src="/static/lava.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
