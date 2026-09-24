@@ -80,7 +80,9 @@ transferencia en Binance), la aprobación automática está bloqueada: recuérda
 ## Automatización que te pido crear
 Una tarea **cada 15 minutos**, que:
 1. Revise `v_pending_messages` para `chatgpt` y `v_proposal_status`.
-2. Si no hay nada pendiente, no haga nada más (sin análisis, para ahorrar uso).
+2. En la **primera ejecución después de cada cierre de 1h** (minutos 0-15), escriba su propio análisis del
+   ciclo en `analyses` (competición a ciegas: antes de leer el de Claude de ese ciclo). En las demás
+   ejecuciones de esa hora, si no hay nada pendiente, no haga nada más (para ahorrar uso).
 3. Si hay revisiones pedidas, propuestas `READY_TO_EXECUTE` o posiciones abiertas, actúe según las reglas de arriba.
 4. Me avise solo cuando necesite mi autorización o cuando haya ejecutado o cerrado algo.
 
