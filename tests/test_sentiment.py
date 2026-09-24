@@ -180,8 +180,8 @@ class CollectTest(unittest.TestCase):
                 if fragment in url:
                     raise TimeoutError(f"caída simulada: {fragment}")
             if "stablecoincharts" in url:
-                return json.dumps([{"date": "1790121600", "totalCirculatingUSD": {"peggedUSD": 310e9}},
-                                   {"date": "1790208000", "totalCirculatingUSD": {"peggedUSD": 311e9}}])
+                return json.dumps([{"date": str(1790208000 - (40 - k) * 86400), "totalCirculatingUSD": {"peggedUSD": 300e9 + k * 1e9}}
+                                   for k in range(41)])
             if "api.llama.fi/protocols" in url:
                 return json.dumps([{"category": "RWA", "tvl": 4.7e9}, {"category": "Dexs", "tvl": 1e9}])
             if "alternative.me" in url:
@@ -217,6 +217,11 @@ class CollectTest(unittest.TestCase):
         self.assertEqual({e["source"] for e in result["errors"]}, {"reddit_cryptocurrency", "alternative_me"})
         self.assertEqual(len(result["observations"]), 13)
         self.assertIn("coindesk", {i["source"] for i in result["news"]})
+
+    def test_summary_includes_stablecoin_growth_like_the_strategy(self):
+        # Último día k=40; con un día de retraso se compara k=39 con k=9: (339/309) - 1.
+        summary = summarize(collect(SINCE, fetch=self.fake_fetch()))
+        self.assertAlmostEqual(summary["stablecoin_growth_30d"], round(339 / 309 - 1, 5))
 
     def test_summary_lists_negative_headlines(self):
         summary = summarize(collect(SINCE, fetch=self.fake_fetch()))

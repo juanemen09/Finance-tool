@@ -16,6 +16,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
+from ai_trading_lab.sentiment_history import growth_series, parse_stablecoin_history
 from ai_trading_lab.sentiment import (
     parse_bluesky, parse_fear_greed, parse_funding, parse_long_short, parse_rss, parse_rwa_tvl,
     parse_stablecoin_supply, to_sql,
@@ -74,7 +75,16 @@ def collect(since, fetch=fetch_text, now=None):
     now = now or datetime.now(timezone.utc)
     observations += attempt("alternative_me", lambda: parse_fear_greed(json.loads(fetch(FEAR_GREED))))
     # Tokenización: el dólar tokenizado (stablecoins) y los activos del mundo real tokenizados (RWA).
-    observations += attempt("defillama:stablecoins", lambda: parse_stablecoin_supply(json.loads(fetch(STABLECOINS))))
+    stable = {}
+
+    def stablecoins():
+        payload = json.loads(fetch(STABLECOINS))
+        growth = growth_series(parse_stablecoin_history(payload), window=30, lag_days=1)
+        if growth:  # el mismo cálculo que usa S-CHANNEL-1D-STABLE: dato de ayer frente al de hace 31 días
+            stable["stablecoin_growth_30d"] = round(growth[max(growth)], 5)
+        return parse_stablecoin_supply(payload)
+
+    observations += attempt("defillama:stablecoins", stablecoins)
     observations += attempt("defillama:rwa", lambda: parse_rwa_tvl(json.loads(fetch(PROTOCOLS)), now))
     for symbol in SYMBOLS:
         q = urllib.parse.urlencode({"symbol": symbol, "limit": 1})
@@ -91,7 +101,7 @@ def collect(since, fetch=fetch_text, now=None):
                                                                   since=since))
     unique = {item["item_key"]: item for item in news}
     news = sorted(unique.values(), key=lambda i: i["published_at"])
-    return {"observations": observations, "news": news, "errors": errors}
+    return {"observations": observations, "news": news, "errors": errors, **stable}
 
 
 def summarize(result):
@@ -106,6 +116,7 @@ def summarize(result):
         "news_per_source": per_source,
         "most_negative": [brief(i) for i in by_tone[:5] if i["sentiment"] < 0],
         "most_positive": [brief(i) for i in reversed(by_tone[-3:]) if i["sentiment"] > 0],
+        "stablecoin_growth_30d": result.get("stablecoin_growth_30d"),
         "errors": result["errors"],
     }
 
