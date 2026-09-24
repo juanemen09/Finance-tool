@@ -79,6 +79,32 @@ Cualquiera de los dos agentes puede proponer. El otro revisa, el usuario autoriz
 6. Al cerrar, inserta en `trade_closures`, con lecciones incluidas. Los stops no necesitan autorización:
    salir nunca se bloquea.
 
+## Estrategias: fuentes, hard testing y uso
+
+Detalle completo en `docs/plans/strategy-pipeline.md`. Lo esencial:
+
+- **Fuentes:** arXiv entra por ingesta automática semanal (`tools/ingest_sources.py`). Quantpedia y SSRN
+  bloquean o no ofrecen acceso automatizado: entran cuando el usuario pega un enlace o un resumen en el chat
+  de cualquier agente (`strategy_sources.submitted_by = 'user'`). Nunca se evade la protección de un sitio ni
+  se copia su texto: solo metadatos, enlace y un resumen propio.
+- **Ciclo de vida** (`strategy_status_events`, lo valida la base): `DISCOVERED` → `CANDIDATE` |
+  `NOT_APPLICABLE` → `PREREGISTERED` → `TESTING` → `REJECTED` | `PAPER` → `LIVE_ELIGIBLE` (**solo el
+  usuario**) → `DEGRADED` → `RETIRED`.
+- **Pre-registro antes de mirar datos:** `test_preregistrations` con hipótesis, rejilla, activos, períodos,
+  costes y umbrales, más el commit del código. Cambiar algo después es otro pre-registro y suma intentos en
+  `v_trial_count`, que alimenta el Deflated Sharpe.
+- **Hard test:** `python -m tools.run_hard_test <prereg.json>`. Solo con código en un commit limpio. La
+  reserva final se usa una única vez por estrategia (la base rechaza un segundo uso).
+- **Papel:** una estrategia `PAPER` emite señales en `strategy_signals` en cada ciclo, pero no respalda
+  operaciones. Tras ≥ 4 semanas y ≥ 20 operaciones hacia delante se revisa (`--kind PAPER_REVIEW`); si pasa,
+  se propone `LIVE_ELIGIBLE` al usuario.
+- **Política del usuario (solo validadas):** en cuanto exista una estrategia `LIVE_ELIGIBLE`, toda compra en
+  `trade_proposals` debe llevar el `strategy_id` de una `LIVE_ELIGIBLE` (la base rechaza las demás). Las ideas
+  discrecionales se registran en `analyses` y se puntúan, pero no se proponen.
+- **Re-test mensual** de cada `LIVE_ELIGIBLE`; si falla, pasa a `DEGRADED` y deja de respaldar operaciones.
+- Implementar una familia nueva de estrategia es un cambio de código: se hace en una sesión supervisada,
+  con pruebas, nunca desde una tarea automática.
+
 ## Desacuerdos
 
 No modifiques ni contradigas en silencio el registro del otro agente. Escribe tu propio registro

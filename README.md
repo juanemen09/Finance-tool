@@ -14,6 +14,14 @@ El protocolo entre agentes está en [AGENTS.md](AGENTS.md).
 | `ai_trading_lab/` | Velas públicas de Binance, indicadores y puntuación de decisiones. |
 | `tools/market_scan.py` | Foto del universo en 1h y 4h con velas cerradas. |
 | `tools/score_decisions.py` | Puntúa decisiones del diario con el precio posterior. |
+| `ai_trading_lab/backtest.py` | Motor de backtest de una posición: entrada en la apertura siguiente, costes, stop antes que target. |
+| `ai_trading_lab/validation.py` | Hard testing: walk-forward, bootstrap, Monte Carlo, entradas aleatorias, meseta, Deflated Sharpe. |
+| `ai_trading_lab/strategies.py` | Catálogo de familias de estrategias formalizadas y sus rejillas pre-registrables. |
+| `ai_trading_lab/data_store.py` | Histórico oficial de Binance (`data.binance.vision`) verificado por SHA-256, en `data/raw/`. |
+| `tools/ingest_sources.py` | Papers recientes de arXiv (q-fin) para clasificar. |
+| `tools/run_hard_test.py` | Ejecuta un pre-registro y devuelve la fila de `backtest_runs`. |
+| `tools/strategy_signals.py` | Señal actual de las estrategias en papel o validadas. |
+| `docs/plans/strategy-pipeline.md` | Protocolo del pipeline de estrategias. |
 | `tests/` | Pruebas unitarias (Python) y de comportamiento del esquema (SQL). |
 
 ## Pruebas

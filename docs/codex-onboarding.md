@@ -48,6 +48,18 @@ Supabase es el canal; no dependas de que yo copie mensajes entre ustedes.
    Tus decisiones se puntúan contra el precio real (`decision_scores`, `v_agent_scoreboard`) y así decidiré
    con datos quién decide mejor.
 
+## Estrategias validadas (nuevo)
+Lee la sección "Estrategias" de `AGENTS.md`. En resumen:
+- Hay un pipeline de estrategias con hard testing obligatorio (pre-registro, walk-forward, reserva final de
+  un solo uso, benchmark de entradas aleatorias, Deflated Sharpe). El estado de cada una está en
+  `v_strategy_board`.
+- **Mi política: en cuanto exista una estrategia `LIVE_ELIGIBLE`, solo se proponen compras respaldadas por
+  ella** (`trade_proposals.strategy_id`; la base rechaza las demás). Tus ideas discrecionales van a `analyses`.
+- Puedes proponer fuentes o estrategias nuevas (registrándolas con `submitted_by = 'chatgpt'`), pero no
+  puedes marcar `LIVE_ELIGIBLE`: eso lo decido yo.
+- Cuando revises una propuesta de Claude respaldada por una estrategia, verifica también que la señal
+  exista en `strategy_signals` para ese ciclo y ese activo.
+
 ## Automatización que te pido crear
 Una tarea **cada hora, al minuto 10**, que:
 1. Revise `v_pending_messages` para `chatgpt` y `v_proposal_status`.
