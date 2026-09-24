@@ -72,7 +72,10 @@ def main():
         sys.exit("DASHBOARD_DATABASE_URL debe usar el rol de solo lectura dashboard_reader, no otro usuario.")
 
     candles = CandleCache()
-    server = make_server(args.port, state_provider=CachedState(ReadOnlyDatabase(url)), candles_provider=candles.get)
+    try:
+        server = make_server(args.port, state_provider=CachedState(ReadOnlyDatabase(url)), candles_provider=candles.get)
+    except OSError:
+        sys.exit(f"El puerto {args.port} ya está en uso: probablemente el panel ya está abierto. Ciérralo o usa --port.")
     address = f"http://127.0.0.1:{server.server_address[1]}/"
     print(f"Centro de mando en {address}  (Ctrl+C para cerrar)")
     if not args.no_browser:

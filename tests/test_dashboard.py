@@ -122,6 +122,11 @@ class ServerTest(unittest.TestCase):
         except urllib.error.HTTPError as e:
             return e.code, e.headers, e.read()
 
+    def test_second_server_on_same_port_fails(self):
+        # En Windows, SO_REUSEADDR deja que dos procesos compartan el puerto y el viejo sigue contestando.
+        with self.assertRaises(OSError):
+            make_server(self.port, state_provider=dict, candles_provider=lambda s, i: {})
+
     def test_binds_only_to_loopback(self):
         self.assertEqual(self.server.server_address[0], "127.0.0.1")
 

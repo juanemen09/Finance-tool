@@ -5,6 +5,7 @@ El chequeo del encabezado Host impide que una web ajena lea el panel mediante DN
 import json
 import logging
 import mimetypes
+import socket
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -81,8 +82,20 @@ def make_handler(state_provider, candles_provider, allowed_hosts):
     return Handler
 
 
+class LocalServer(ThreadingHTTPServer):
+    # En Windows, SO_REUSEADDR deja que dos procesos compartan el puerto: un panel viejo con otra configuración
+    # seguía contestando. Con el puerto exclusivo, el segundo arranque falla con un error claro.
+    allow_reuse_address = False
+    daemon_threads = True
+
+    def server_bind(self):
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
 def make_server(port, state_provider, candles_provider):
-    server = ThreadingHTTPServer(("127.0.0.1", port), None)
+    server = LocalServer(("127.0.0.1", port), None)
     real_port = server.server_address[1]
     allowed = {f"127.0.0.1:{real_port}", f"localhost:{real_port}"}
     server.RequestHandlerClass = make_handler(state_provider, candles_provider, allowed)
