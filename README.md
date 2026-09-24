@@ -21,6 +21,8 @@ El protocolo entre agentes está en [AGENTS.md](AGENTS.md).
 | `tools/ingest_sources.py` | Papers recientes de arXiv (q-fin) para clasificar. |
 | `tools/run_hard_test.py` | Ejecuta un pre-registro y devuelve la fila de `backtest_runs`. |
 | `tools/strategy_signals.py` | Señal actual de las estrategias en papel o validadas. |
+| `ai_trading_lab/sentiment.py` | Sentimiento: parseo de Fear & Greed, funding, largo/corto, RSS y Bluesky; tono con VADER + léxico cripto. |
+| `tools/ingest_sentiment.py` | Recolector horario de sentimiento y titulares; genera el SQL de inserción. |
 | `docs/plans/strategy-pipeline.md` | Protocolo del pipeline de estrategias. |
 | `tests/` | Pruebas unitarias (Python) y de comportamiento del esquema (SQL). |
 
