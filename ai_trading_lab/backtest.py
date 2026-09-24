@@ -133,6 +133,7 @@ def lookahead_violations(strategy, bars, params, checkpoints):
         same_entry = bool(full.entries[k]) == bool(partial.entries[k])
         same_stop = np.isclose(full.stop[k], partial.stop[k], equal_nan=True)
         same_target = np.isclose(full.target[k], partial.target[k], equal_nan=True)
-        if not (same_entry and same_stop and same_target):
+        same_exit = full.exits is None or bool(full.exits[k]) == bool(partial.exits[k])
+        if not (same_entry and same_stop and same_target and same_exit):
             bad.append(int(k))
     return bad

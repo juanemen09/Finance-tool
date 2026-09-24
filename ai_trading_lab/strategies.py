@@ -29,12 +29,20 @@ def atr(bars, period=14):
     return out
 
 
-def rolling_max(values, window):
-    """Máximo de las `window` velas anteriores a i (sin incluir i)."""
+def _rolling(values, window, reducer):
+    """reducer de las `window` velas anteriores a i (sin incluir i)."""
     out = np.full(len(values), np.nan)
-    for i in range(window, len(values)):
-        out[i] = values[i - window:i].max()
+    if len(values) > window:
+        out[window:] = reducer(np.lib.stride_tricks.sliding_window_view(values, window)[: len(values) - window], axis=1)
     return out
+
+
+def rolling_max(values, window):
+    return _rolling(values, window, np.max)
+
+
+def rolling_min(values, window):
+    return _rolling(values, window, np.min)
 
 
 def _atr_exits(bars, entries, a, stop_atr, target_atr):
@@ -74,6 +82,48 @@ def drop_reversal(bars, p):
     return Signals(entries, stop, np.full(len(bars), np.nan), max_hold=p["max_hold"])
 
 
+def channel_trend(bars, p):
+    """Canal de Donchian con salida por el canal contrario (reglas tipo tortuga): entra al superar el máximo
+    de N velas y sale al perder el mínimo de M; stop de protección en k ATR. Pensada para 4h y diario, donde
+    pocas operaciones largas diluyen el coste."""
+    a = atr(bars)
+    entries = (bars.close > rolling_max(bars.high, p["entry_lookback"])) & ~np.isnan(a)
+    exits = bars.close < rolling_min(bars.low, p["exit_lookback"])
+    stop = np.where(entries, bars.close - p["stop_atr"] * a, np.nan)
+    return Signals(entries, stop, np.full(len(bars), np.nan), exits=exits)
+
+
+def tsmom(bars, p):
+    """Momentum de serie temporal: entra cuando el retorno de las últimas N velas supera el umbral y sale
+    cuando deja de ser positivo; stop de protección en k ATR."""
+    n = p["lookback"]
+    past = np.concatenate((np.full(n, np.nan), bars.close[:-n]))
+    momentum = bars.close / past - 1
+    on = momentum > p["threshold"]
+    entries = on & ~np.concatenate(([False], on[:-1]))
+    a = atr(bars)
+    entries &= ~np.isnan(a)
+    stop = np.where(entries, bars.close - p["stop_atr"] * a, np.nan)
+    return Signals(entries, stop, np.full(len(bars), np.nan), exits=momentum <= 0)
+
+
+def squeeze_breakout(bars, p):
+    """Compresión de volatilidad seguida de ruptura: el ancho de Bollinger de la vela previa está cerca de su
+    mínimo de `lookback` velas y el cierre supera la banda superior."""
+    w = p["bb"]
+    windows = np.lib.stride_tricks.sliding_window_view(bars.close, w)
+    ma = np.full(len(bars), np.nan)
+    sd = np.full(len(bars), np.nan)
+    ma[w - 1:] = windows.mean(axis=1)
+    sd[w - 1:] = windows.std(axis=1)
+    width = 4 * sd / ma
+    prev_width = np.concatenate(([np.nan], width[:-1]))
+    squeezed = prev_width <= 1.1 * rolling_min(width, p["lookback"])
+    entries = squeezed & (bars.close > ma + 2 * sd)
+    entries, stop, target = _atr_exits(bars, entries, atr(bars), p["stop_atr"], p["target_atr"])
+    return Signals(entries, stop, target, max_hold=p["max_hold"])
+
+
 def grid(**axes):
     """Producto cartesiano de parámetros, en orden estable."""
     combos = [{}]
@@ -86,4 +136,9 @@ CATALOG = {
     "breakout": (breakout, grid(lookback=[24, 48, 96], stop_atr=[1.5, 2.5], target_atr=[3.0, 5.0], max_hold=[48])),
     "ema_trend": (ema_trend, grid(fast=[12, 24], slow=[72, 168], stop_atr=[1.5, 2.5], target_atr=[3.0, 5.0], max_hold=[72])),
     "drop_reversal": (drop_reversal, grid(drop_atr=[2.0, 2.5, 3.0], trend_ema=[0, 200], stop_atr=[1.5, 2.5], max_hold=[6, 12])),
+    # Familias de baja rotación para 4h y diario (los parámetros están en velas de la temporalidad probada).
+    "channel_trend": (channel_trend, grid(entry_lookback=[20, 55], exit_lookback=[10, 20], stop_atr=[2.0, 3.0])),
+    "tsmom": (tsmom, grid(lookback=[20, 60, 120], threshold=[0.0, 0.05], stop_atr=[2.5])),
+    "squeeze_breakout": (squeeze_breakout, grid(bb=[20], lookback=[60, 120], stop_atr=[1.5, 2.5],
+                                                target_atr=[3.0, 5.0], max_hold=[30])),
 }

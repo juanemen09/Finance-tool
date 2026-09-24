@@ -39,6 +39,12 @@ class EngineTest(unittest.TestCase):
         [t] = run(b, signals_at(6, 0, max_hold=3), NO_COSTS)
         self.assertEqual((t.exit_reason, t.bars_held), ("TIME", 3))
 
+    def test_exit_signal_leaves_at_next_open(self):
+        b = bars((100, 101, 99, 100), (100, 101, 99, 100), (102, 103, 101, 102), (104, 105, 103, 104))
+        exits = np.array([False, False, True, False])
+        [t] = run(b, signals_at(4, 0, exits=exits), NO_COSTS)
+        self.assertEqual((t.exit_reason, t.exit_idx, t.exit_price), ("SIGNAL", 3, 104))
+
     def test_costs_are_charged_on_both_sides(self):
         b = bars((100, 100, 100, 100), (100, 100, 100, 100), (100, 100, 100, 100))
         [t] = run(b, signals_at(3, 0, max_hold=2), Costs(0.001, 0.0005))
@@ -71,6 +77,15 @@ class LookaheadTest(unittest.TestCase):
             for params in params_grid[:3]:
                 with self.subTest(strategy=name, params=params):
                     self.assertEqual(lookahead_violations(strategy, b, params, checkpoints), [])
+
+    def test_detector_catches_an_exit_that_peeks(self):
+        def peeking_exit(bars, p):
+            n = len(bars)
+            future = np.concatenate((bars.close[1:], [bars.close[-1]]))
+            return Signals(np.ones(n, bool), np.full(n, NAN), np.full(n, NAN), exits=future < bars.close)
+
+        b = random_walk(400, np.random.default_rng(2))
+        self.assertNotEqual(lookahead_violations(peeking_exit, b, {}, range(100, 399, 10)), [])
 
     def test_detector_catches_a_cheating_strategy(self):
         def peeks(bars, p):

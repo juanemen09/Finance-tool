@@ -76,8 +76,42 @@ def _months(start, end):
         y, m = (y + 1, 1) if m == 12 else (y, m + 1)
 
 
+HOUR_MS = 3_600_000
+HOURS_PER_INTERVAL = {"1h": 1, "4h": 4, "1d": 24}
+
+
+def resample(bars, hours):
+    """Agrupa velas de 1h en bloques alineados a UTC (00:00, 04:00, ... como Binance). El último bloque se
+    descarta si aún no cerró; un bloque con huecos de mantenimiento se conserva con las horas que tenga."""
+    if hours == 1:
+        return bars
+    bucket_ms = hours * HOUR_MS
+    keys = bars.open_time // bucket_ms
+    starts = np.flatnonzero(np.r_[True, keys[1:] != keys[:-1]])
+    ends = np.r_[starts[1:], len(bars)]
+    open_time = keys[starts] * bucket_ms
+    last_complete = bars.open_time[-1] + HOUR_MS >= open_time[-1] + bucket_ms
+    first = 0 if bars.open_time[0] == open_time[0] else 1  # el bloque inicial empezado a medias no es una vela real
+    n = len(starts) if last_complete else len(starts) - 1
+    return Bars(
+        open_time[first:n],
+        bars.open[starts][first:n],
+        np.maximum.reduceat(bars.high, starts)[first:n],
+        np.minimum.reduceat(bars.low, starts)[first:n],
+        bars.close[ends - 1][first:n],
+        np.add.reduceat(bars.volume, starts)[first:n],
+    )
+
+
 def load(symbol, interval="1h", since=date(2017, 8, 1), now=None):
-    """Velas cerradas de `since` hasta ahora. Devuelve (Bars, data_hash)."""
+    """Velas cerradas de `since` hasta ahora. Devuelve (Bars, data_hash).
+
+    4h y 1d se construyen desde las velas de 1h verificadas: un solo origen de datos para todas las temporalidades.
+    """
+    if interval != "1h":
+        hourly, hourly_hash = load(symbol, "1h", since, now)
+        digest = hashlib.sha256(f"{hourly_hash}:{interval}".encode()).hexdigest()
+        return resample(hourly, HOURS_PER_INTERVAL[interval]), digest
     now = now or datetime.now(timezone.utc)
     last_full_month = date(now.year, now.month, 1)
     rows, digests = {}, []

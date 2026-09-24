@@ -20,6 +20,36 @@ ROW_MS = [1_704_067_200_000, 100, 110, 90, 105, 1, 0, 0, 0, 0, 0, 0]
 ROW_US = [1_735_689_600_000_000, 200, 210, 190, 205, 1, 0, 0, 0, 0, 0, 0]
 
 
+class ResampleTest(unittest.TestCase):
+    H = 3_600_000
+    T0 = 1_790_208_000_000  # 2026-09-24T00:00Z, múltiplo de 4h y de 1d
+
+    def hourly(self, n, start=None):
+        import numpy as np
+        from ai_trading_lab.backtest import Bars
+        start = self.T0 if start is None else start
+        t = start + np.arange(n, dtype=np.int64) * self.H
+        o = np.arange(n, dtype=float) + 100
+        return Bars(t, o, o + 2, o - 1, o + 0.5, np.ones(n))
+
+    def test_aggregates_ohlcv_in_utc_aligned_blocks(self):
+        b = data_store.resample(self.hourly(8), 4)
+        self.assertEqual(list(b.open_time), [self.T0, self.T0 + 4 * self.H])
+        self.assertEqual(list(b.open), [100, 104])
+        self.assertEqual(list(b.high), [105, 109])   # máximo de las 4 horas
+        self.assertEqual(list(b.low), [99, 103])     # mínimo de las 4 horas
+        self.assertEqual(list(b.close), [103.5, 107.5])
+        self.assertEqual(list(b.volume), [4, 4])
+
+    def test_drops_block_that_has_not_closed(self):
+        b = data_store.resample(self.hourly(6), 4)  # el segundo bloque solo tiene 2 de 4 horas
+        self.assertEqual(len(b), 1)
+
+    def test_daily_blocks_start_at_midnight_utc(self):
+        b = data_store.resample(self.hourly(48, start=self.T0 - 5 * self.H), 24)
+        self.assertEqual(list(b.open_time), [self.T0])  # el día parcial previo y el último incompleto se descartan
+
+
 class DataStoreTest(unittest.TestCase):
     def fake_get(self, payload, checksum):
         return lambda url: checksum.encode() if url.endswith(".CHECKSUM") else payload
