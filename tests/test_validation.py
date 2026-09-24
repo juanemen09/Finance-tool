@@ -7,7 +7,7 @@ from ai_trading_lab.strategies import CATALOG, grid
 from ai_trading_lab.validation import (
     bootstrap_mean_ci, deflated_sharpe, hard_test, plateau_fraction, summarize, walk_forward_windows,
 )
-from tests.synthetic import planted_edge, random_walk
+from tests.synthetic import planted_edge, random_walk, with_sentiment
 
 YEARS_3 = 3 * 8760
 
@@ -72,7 +72,7 @@ class CalibrationTest(unittest.TestCase):
         passes = []
         for seed in range(4):
             rng = np.random.default_rng(100 + seed)
-            data = {"A": random_walk(YEARS_3, rng), "B": random_walk(YEARS_3, rng)}
+            data = {"A": with_sentiment(random_walk(YEARS_3, rng), rng), "B": with_sentiment(random_walk(YEARS_3, rng), rng)}
             for name, (strategy, params_grid) in CATALOG.items():
                 report = hard_test(strategy, params_grid[:6], data, seed=seed)
                 passes.append((seed, name, report["verdict"]))

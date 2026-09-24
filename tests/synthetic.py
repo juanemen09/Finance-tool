@@ -40,3 +40,9 @@ def bars(*ohlc):
     a = np.array(ohlc, float)
     t = START_MS + np.arange(len(a), dtype=np.int64) * HOUR_MS
     return Bars(t, a[:, 0], a[:, 1], a[:, 2], a[:, 3], np.ones(len(a)))
+
+
+def with_sentiment(b, rng):
+    """Series de sentimiento sintéticas sin relación con el precio, para las familias que las exigen."""
+    features = {"fear_greed": rng.uniform(0, 100, len(b)), "funding": rng.normal(3e-4, 3e-4, len(b))}
+    return Bars(b.open_time, b.open, b.high, b.low, b.close, b.volume, features=features)

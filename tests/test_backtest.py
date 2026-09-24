@@ -4,7 +4,7 @@ import numpy as np
 
 from ai_trading_lab.backtest import Costs, Signals, lookahead_violations, run
 from ai_trading_lab.strategies import CATALOG
-from tests.synthetic import bars, random_walk
+from tests.synthetic import bars, random_walk, with_sentiment
 
 NO_COSTS = Costs(0.0, 0.0)
 NAN = np.nan
@@ -71,7 +71,8 @@ class EngineTest(unittest.TestCase):
 
 class LookaheadTest(unittest.TestCase):
     def test_catalog_strategies_never_use_future_bars(self):
-        b = random_walk(1500, np.random.default_rng(7))
+        rng = np.random.default_rng(7)
+        b = with_sentiment(random_walk(1500, rng), rng)
         checkpoints = range(250, 1499, 97)
         for name, (strategy, params_grid) in CATALOG.items():
             for params in params_grid[:3]:

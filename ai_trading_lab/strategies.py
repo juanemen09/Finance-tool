@@ -93,6 +93,18 @@ def channel_trend(bars, p):
     return Signals(entries, stop, np.full(len(bars), np.nan), exits=exits)
 
 
+def channel_trend_filtered(bars, p):
+    """channel_trend que no entra cuando la multitud está eufórica: si la serie `filter` de la vela de la señal
+    (Fear & Greed del día, o funding sumado del día) es >= max_value, o falta, no hay entrada. Las salidas no
+    se filtran: salir nunca se bloquea. max_value None reproduce la estrategia base."""
+    base = channel_trend(bars, p)
+    if p["max_value"] is None:
+        return base
+    feature = bars.features[p["filter"]] if bars.features else {}[p["filter"]]  # sin la serie: error, no un pase
+    entries = base.entries & (feature < p["max_value"])  # nan < x es False: sin dato no se entra
+    return Signals(entries, np.where(entries, base.stop, np.nan), base.target, exits=base.exits)
+
+
 def tsmom(bars, p):
     """Momentum de serie temporal: entra cuando el retorno de las últimas N velas supera el umbral y sale
     cuando deja de ser positivo; stop de protección en k ATR."""
@@ -138,6 +150,9 @@ CATALOG = {
     "drop_reversal": (drop_reversal, grid(drop_atr=[2.0, 2.5, 3.0], trend_ema=[0, 200], stop_atr=[1.5, 2.5], max_hold=[6, 12])),
     # Familias de baja rotación para 4h y diario (los parámetros están en velas de la temporalidad probada).
     "channel_trend": (channel_trend, grid(entry_lookback=[20, 55], exit_lookback=[10, 20], stop_atr=[2.0, 3.0])),
+    # Base = S-CHANNEL-1D (20/10, stop 2 ATR); solo varía el umbral del filtro (la base se compara aparte).
+    "channel_trend_filtered": (channel_trend_filtered, grid(entry_lookback=[20], exit_lookback=[10], stop_atr=[2.0],
+                                                            filter=["fear_greed"], max_value=[60, 70, 80, 90])),
     "tsmom": (tsmom, grid(lookback=[20, 60, 120], threshold=[0.0, 0.05], stop_atr=[2.5])),
     "squeeze_breakout": (squeeze_breakout, grid(bb=[20], lookback=[60, 120], stop_atr=[1.5, 2.5],
                                                 target_atr=[3.0, 5.0], max_hold=[30])),

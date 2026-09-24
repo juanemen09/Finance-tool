@@ -9,7 +9,7 @@ from statistics import NormalDist
 
 import numpy as np
 
-from ai_trading_lab.backtest import Costs, run
+from ai_trading_lab.backtest import Bars, Costs, run
 
 HOURS_PER_YEAR = 8760
 EULER_GAMMA = 0.5772156649
@@ -24,6 +24,10 @@ DEFAULT_THRESHOLDS = {
     "double_cost_mean_gt": 0.0,
     "positive_year_fraction_min": 0.6,
     "deflated_sharpe_min": 0.95,
+    # Operaciones mínimas en un tramo de entrenamiento para poder elegir parámetros por su estadístico t. Con
+    # velas diarias (~7 operaciones por año y activo) 10 nunca se alcanzaba y se elegía siempre la primera
+    # combinación de la rejilla; los pre-registros diarios nuevos lo fijan explícitamente.
+    "min_trades_selection": 10,
 }
 
 
@@ -112,10 +116,10 @@ def random_entry_benchmark(bars_by_symbol, trades_by_symbol, windows_by_symbol, 
 # Walk-forward
 # ---------------------------------------------------------------------------
 
-def _score(returns):
+def _score(returns, min_trades=10):
     """Criterio de selección en entrenamiento: estadístico t del retorno medio (premia constancia, no suerte)."""
     r = np.asarray(returns, float)
-    if len(r) < 10 or r.std(ddof=1) == 0:
+    if len(r) < max(min_trades, 2) or r.std(ddof=1) == 0:
         return -np.inf
     return r.mean() / r.std(ddof=1) * math.sqrt(len(r))
 
@@ -143,7 +147,7 @@ def plateau_fraction(dev_means, best):
 
 
 def hard_test(strategy, param_grid, bars_by_symbol, *, costs=Costs(), holdout_bars=4380,
-              train_bars=8760, test_bars=2190, n_trials_total=None, thresholds=None, seed=0):
+              train_bars=8760, test_bars=2190, n_trials_total=None, thresholds=None, seed=0, allow_holdout=True):
     """Devuelve un informe con cada chequeo (valor, umbral, pasó) y el veredicto PASS/FAIL."""
     th = {**DEFAULT_THRESHOLDS, **(thresholds or {})}
     rng = np.random.default_rng(seed)
@@ -167,7 +171,7 @@ def hard_test(strategy, param_grid, bars_by_symbol, *, costs=Costs(), holdout_ba
     for s, b in bars_by_symbol.items():
         for (tr0, tr1), (te0, te1) in walk_forward_windows(dev_end[s], train_bars, test_bars):
             best = max(param_grid, key=lambda p: _score(
-                [t.net_return for t in run(b, signals[s][_param_key(p)], costs, (tr0, tr1))]))
+                [t.net_return for t in run(b, signals[s][_param_key(p)], costs, (tr0, tr1))], th["min_trades_selection"]))
             chosen[_param_key(best)] += 1
             sig = signals[s][_param_key(best)]
             oos_trades[s] += run(b, sig, costs, (te0, te1))
@@ -210,7 +214,8 @@ def hard_test(strategy, param_grid, bars_by_symbol, *, costs=Costs(), holdout_ba
     check("parameter_plateau", plateau, th["plateau_fraction_min"], plateau >= th["plateau_fraction_min"])
 
     # 3. Reserva final: solo se consume si todo lo anterior pasó.
-    pre_holdout_pass = all(c["passed"] for c in checks.values())
+    # allow_holdout=False: otra prueba previa (p. ej. la incremental) ya falló y la reserva no debe gastarse.
+    pre_holdout_pass = allow_holdout and all(c["passed"] for c in checks.values())
     holdout = None
     if pre_holdout_pass:
         k = _param_key(favorite)
@@ -231,6 +236,61 @@ def hard_test(strategy, param_grid, bars_by_symbol, *, costs=Costs(), holdout_ba
         "holdout": holdout,
         "checks": checks,
         "costs": {"fee_rate": costs.fee_rate, "slippage": costs.slippage},
+    }
+
+
+def _paired_windows(strategy, param_grid, baseline_params, devs, costs, train_bars, test_bars, min_trades_selection):
+    diffs, blocked, chosen = [], 0, Counter()
+    for dev in devs:
+        signals = {_param_key(p): strategy(dev, p) for p in param_grid}
+        base = strategy(dev, baseline_params)
+        for (tr0, tr1), (te0, te1) in walk_forward_windows(len(dev), train_bars, test_bars):
+            best = max(param_grid, key=lambda p: _score(
+                [t.net_return for t in run(dev, signals[_param_key(p)], costs, (tr0, tr1))], min_trades_selection))
+            k = _param_key(best)
+            chosen[k] += 1
+            variant = sum(t.net_return for t in run(dev, signals[k], costs, (te0, te1)))
+            baseline = sum(t.net_return for t in run(dev, base, costs, (te0, te1)))
+            diffs.append(variant - baseline)
+            blocked += int((base.entries[te0:te1] & ~signals[k].entries[te0:te1]).sum())
+    return np.asarray(diffs, float), blocked, chosen
+
+
+def _shifted(bars, rng):
+    """Mismas series externas desplazadas en el tiempo: conservan su distribución y sus rachas, pero pierden
+    cualquier relación con el precio."""
+    offset = int(rng.integers(1, len(bars)))
+    features = {k: np.roll(v, offset) for k, v in bars.features.items()}
+    return Bars(bars.open_time, bars.open, bars.high, bars.low, bars.close, bars.volume, features=features)
+
+
+def incremental_test(strategy, param_grid, baseline_params, bars_by_symbol, *, costs=Costs(), holdout_bars,
+                     train_bars, test_bars, min_trades_selection=10, null_sims=200, seed=0):
+    """¿Aporta el filtro? Walk-forward pareado solo sobre el desarrollo (la reserva ni se calcula): en cada
+    tramo de prueba, la variante elegida en su entrenamiento contra la base, con las mismas velas.
+
+    Ganarle a la base no basta: si la base pierde (costes), bloquear operaciones al azar también "mejora".
+    Por eso la mejora se compara con la de la misma variante usando la serie externa desplazada en el tiempo
+    (null_sims veces); null_percentile es el porcentaje de esos filtros de azar que quedan por debajo."""
+    rng = np.random.default_rng(seed)
+    devs = [b.slice(0, len(b) - holdout_bars) for b in bars_by_symbol.values()]
+    args = (strategy, param_grid, baseline_params)
+    rest = (costs, train_bars, test_bars, min_trades_selection)
+    d, blocked, chosen = _paired_windows(*args, devs, *rest)
+    lo, hi = bootstrap_mean_ci(d, rng) if len(d) >= 3 else (None, None)
+    null = [_paired_windows(*args, [_shifted(dev, rng) for dev in devs], *rest)[0].mean() for _ in range(null_sims)]
+    return {
+        "n_windows": int(len(d)),
+        "mean_diff": float(d.mean()) if len(d) else None,
+        "ci_lower": lo,
+        "ci_upper": hi,
+        "windows_better": int((d > 0).sum()),
+        "windows_worse": int((d < 0).sum()),
+        "blocked_signals": blocked,
+        "null_sims": null_sims,
+        "null_mean_diff_median": float(np.median(null)) if null else None,
+        "null_percentile": float((np.asarray(null) < d.mean()).mean() * 100) if null and len(d) else None,
+        "chosen_params_count": {str(dict(k)): v for k, v in chosen.items()},
     }
 
 

@@ -17,8 +17,9 @@ import numpy as np
 
 from ai_trading_lab import data_store
 from ai_trading_lab.backtest import Costs, run
+from ai_trading_lab.sentiment_history import attach_daily_features, daily_funding, load_fear_greed, load_funding_events
 from ai_trading_lab.strategies import CATALOG
-from ai_trading_lab.validation import hard_test, summarize
+from ai_trading_lab.validation import DEFAULT_THRESHOLDS, hard_test, incremental_test, summarize
 
 MIN_FORWARD_TRADES = 20
 
@@ -35,6 +36,49 @@ def code_commit():
     dirty = subprocess.run(["git", "status", "--porcelain", "--", "ai_trading_lab", "tools"],
                            capture_output=True, text=True).stdout.strip()
     return head + ("+dirty" if dirty else "")
+
+
+def load_features(pre, bars_by_symbol, data_hashes):
+    """Añade las series de sentimiento que pide la rejilla (parámetro `filter`) y registra su hash."""
+    filters = sorted({p["filter"] for p in pre["param_grid"] if "filter" in p})
+    if not filters:
+        return bars_by_symbol
+    if pre["bar_interval"] != "1d":
+        raise SystemExit("Las series de sentimiento son diarias: solo se prueban con bar_interval '1d'.")
+    shared = {}
+    if "fear_greed" in filters:
+        shared["fear_greed"], data_hashes["fear_greed"] = load_fear_greed()
+    out = {}
+    for symbol, bars in bars_by_symbol.items():
+        series = dict(shared)
+        if "funding" in filters:
+            events, data_hashes[f"funding:{symbol}"] = load_funding_events(symbol)
+            series["funding"] = daily_funding(events)
+        out[symbol] = attach_daily_features(bars, series)
+    return out
+
+
+def incremental_checks(pre, strategy, bars_by_symbol, costs):
+    """Si el pre-registro compara contra una base, la variante debe aportar antes de gastar la reserva."""
+    th = {**DEFAULT_THRESHOLDS, **(pre.get("thresholds") or {})}
+    cfg = th.get("incremental")
+    if not cfg:
+        return None, {}
+    result = incremental_test(strategy, pre["param_grid"], cfg["baseline_params"], bars_by_symbol, costs=costs,
+                              holdout_bars=pre["holdout_bars"], train_bars=pre["train_bars"],
+                              test_bars=pre["test_bars"], min_trades_selection=th["min_trades_selection"],
+                              null_sims=cfg.get("null_sims", 200))
+    pct_min, blocked_min = cfg.get("null_percentile_min", 95.0), cfg.get("min_blocked_signals", 10)
+    checks = {
+        "increment_mean_diff": {"value": result["mean_diff"], "threshold": 0.0,
+                                "passed": result["mean_diff"] is not None and result["mean_diff"] > 0},
+        "increment_null_percentile": {"value": result["null_percentile"], "threshold": pct_min,
+                                      "passed": result["null_percentile"] is not None
+                                      and result["null_percentile"] >= pct_min},
+        "increment_blocked_signals": {"value": result["blocked_signals"], "threshold": blocked_min,
+                                      "passed": result["blocked_signals"] >= blocked_min},
+    }
+    return result, checks
 
 
 def forward_review(strategy, params, bars_by_symbol, since_ms, costs, expected_lower):
@@ -66,12 +110,20 @@ def main():
     loaded = {s: data_store.load(s, pre["bar_interval"]) for s in pre["symbols"]}
     bars_by_symbol = {s: b for s, (b, _) in loaded.items()}
     data_hashes = {s: h for s, (_, h) in loaded.items()}
+    bars_by_symbol = load_features(pre, bars_by_symbol, data_hashes)
     now = datetime.now(timezone.utc)
 
     if args.kind == "HARD_TEST":
+        incremental, inc_checks = incremental_checks(pre, strategy, bars_by_symbol, costs)
         report = hard_test(strategy, pre["param_grid"], bars_by_symbol, costs=costs,
                            holdout_bars=pre["holdout_bars"], train_bars=pre["train_bars"], test_bars=pre["test_bars"],
-                           n_trials_total=pre["n_trials_total"], thresholds=pre.get("thresholds"))
+                           n_trials_total=pre["n_trials_total"], thresholds=pre.get("thresholds"),
+                           allow_holdout=all(c["passed"] for c in inc_checks.values()))
+        if incremental is not None:
+            report["incremental"] = incremental
+            report["checks"].update(inc_checks)
+            report["verdict"] = "PASS" if all(c["passed"] for c in report["checks"].values()) else "FAIL"
+        report["bars_from"] = {s: int(b.open_time[0]) for s, b in bars_by_symbol.items()}
         verdict, holdout_used = report["verdict"], report["holdout_used"]
     else:
         since_ms = int(datetime.combine(date.fromisoformat(args.since), datetime.min.time(), timezone.utc).timestamp() * 1000)

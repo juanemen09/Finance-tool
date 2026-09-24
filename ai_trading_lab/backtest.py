@@ -21,12 +21,16 @@ class Bars:
     low: np.ndarray
     close: np.ndarray
     volume: np.ndarray
+    # Series externas alineadas vela a vela (p. ej. Fear & Greed); el valor de i solo puede usar datos hasta i.
+    features: dict | None = field(default=None, compare=False, repr=False)
 
     def __len__(self):
         return len(self.close)
 
     def slice(self, start, stop):
-        return Bars(*(a[start:stop] for a in (self.open_time, self.open, self.high, self.low, self.close, self.volume)))
+        arrays = (a[start:stop] for a in (self.open_time, self.open, self.high, self.low, self.close, self.volume))
+        features = {k: v[start:stop] for k, v in self.features.items()} if self.features else None
+        return Bars(*arrays, features=features)
 
 
 @dataclass(frozen=True)
