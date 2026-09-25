@@ -1,6 +1,9 @@
 -- El rol de ingesta solo añade filas de Claude en las tablas de sentimiento. Transacción revertida.
 begin;
 
+-- postgres administra los roles pero no puede asumirlos (PG16): se le da SET solo dentro de esta transacción.
+grant lab_ingest, dashboard_reader to current_user with set true;
+
 create function pg_temp.expect_error(stmt text, fragment text) returns void language plpgsql as $$
 begin
   execute stmt;

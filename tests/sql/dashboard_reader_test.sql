@@ -1,6 +1,9 @@
 -- El rol del centro de mando lee todo y no puede cambiar nada. Transacción revertida: no deja rastro.
 begin;
 
+-- postgres administra los roles pero no puede asumirlos (PG16): se le da SET solo dentro de esta transacción.
+grant lab_ingest, dashboard_reader to current_user with set true;
+
 create function pg_temp.expect_error(stmt text, fragment text) returns void language plpgsql as $$
 begin
   execute stmt;
