@@ -45,6 +45,7 @@ SQL = {
     "rwa": "select value, observed_at from sentiment_observations where metric = 'rwa_tvl_usd' "
            "order by observed_at desc limit 60",
     "research": "select source, title, url, own_summary, created_at from strategy_sources order by id desc limit 8",
+    "ai_thesis": "select kind, as_of, title, body, data, created_at from v_research_latest",
     "equity": "select observed_at, balances from portfolio_snapshots order by observed_at limit 2000",
     "timeline": "select * from ("
                 " select created_at as at, 'analysis' as kind, agent_id as agent, coalesce(proposed_action, '') as title,"
@@ -134,6 +135,7 @@ def build_state(run_query, now):
         "sentiment": {"latest": q["sentiment"], "tone_24h": q["tone"]},
         "news": q["news"],
         "research": q["research"],
+        "ai_thesis": {r["kind"]: r for r in q["ai_thesis"]},
         "themes": q["themes"],
         "rwa": q["rwa"],
         "equity": equity_curve(q["equity"]),

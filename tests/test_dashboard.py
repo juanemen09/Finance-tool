@@ -25,6 +25,9 @@ def fake_rows(sql):
                  "proposed_action": "DO_NOTHING", "cycle_id": "2026-09-24T06Z"}]
     if "max(at)" in sql:
         return []
+    if "v_research_latest" in sql:
+        return [{"kind": "13F_BOOK", "as_of": NOW.date(), "title": "Libro 13F", "body": "b",
+                 "data": {"book": []}, "created_at": NOW}]
     if "select observed_at, balances from portfolio_snapshots" in sql:
         return [{"observed_at": NOW, "balances": [{"asset": "USDT", "free": "20.0", "locked": "0"}]}]
     return []
@@ -79,6 +82,7 @@ class ShapingTest(unittest.TestCase):
                     "proposals", "sentiment", "news", "research", "equity", "risk_limits", "open_events"):
             self.assertIn(key, state)
         self.assertNotIn("postgresql://", json.dumps(state))
+        self.assertEqual(list(state["ai_thesis"]), ["13F_BOOK"], "la tesis IA llega indexada por tipo de informe")
 
 
 class MarketTest(unittest.TestCase):

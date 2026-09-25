@@ -294,6 +294,86 @@
     }));
   }
 
+  // ---------------------------------------------------------------- tesis IA (13F, demanda, oferta)
+  const CHANGE_NAMES = { NEW: "nueva", ADD: "sube", TRIM: "baja", SAME: "igual" };
+  const bn = (v) => (v === null || v === undefined) ? "—" : `${num(v / 1e9, 1)} mil M`;
+  const signed = (v, d = 1) => (v === null || v === undefined) ? "—" : `${v > 0 ? "+" : ""}${num(v, d)} %`;
+  const toneOf = (v) => v > 0 ? "tone-pos" : v < 0 ? "tone-neg" : "";
+  const source = (url, label) => safeUrl(url) ? h("a", { href: url, target: "_blank", rel: "noopener noreferrer", text: label }) : null;
+
+  function miniSeries(values) {
+    const W = 220, H = 40;
+    const el = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "spark", preserveAspectRatio: "none", role: "img", "aria-label": "Serie mensual" });
+    const vals = values.filter((v) => v !== null && v !== undefined);
+    if (vals.length < 2) return el;
+    const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+    const d = vals.map((v, i) => `${i ? "L" : "M"}${(i / (vals.length - 1) * W).toFixed(1)},${(H - 4 - (v - lo) / span * (H - 8)).toFixed(1)}`).join(" ");
+    el.append(svg("path", { d, class: "line" }));
+    return el;
+  }
+
+  // La CSP prohíbe atributos style: el ancho se pone por CSSOM, como en el resto del panel.
+  function widthBar(percent) {
+    const bar = h("span", { class: "bar" }, h("i"));
+    bar.firstChild.style.width = `${percent.toFixed(1)}%`;
+    return bar;
+  }
+
+  function renderAiThesis() {
+    const t = state.ai_thesis || {};
+    const book = t["13F_BOOK"]?.data, demand = t.AI_DEMAND?.data, supply = t.AI_SUPPLY?.data, neck = t.AI_BOTTLENECK;
+    const empty = (id, text) => fill(id, h("p", { class: "empty", text }));
+
+    if (book) {
+      const changes = Object.fromEntries((book.changes || []).map((c) => [c.cusip, c.change]));
+      const exits = (book.changes || []).filter((c) => c.change === "EXIT").map((c) => c.ticker || c.issuer);
+      const top = book.book[0]?.weight || 1;
+      fill("ai-book", h("h3", { text: "Libro 13F · Situational Awareness" }),
+        h("div", { class: "sub", text: `Al ${book.report_date} (presentado ${book.filing_date}) · ${bn(book.total_long_usd)} USD en ${book.book.length} acciones` }),
+        book.book.slice(0, 12).map((b) => h("div", { class: "weight-row" },
+          h("span", {}, b.ticker || b.issuer.slice(0, 10), changes[b.cusip] && changes[b.cusip] !== "SAME" ? h("span", { class: "tag", text: CHANGE_NAMES[changes[b.cusip]] }) : null),
+          widthBar(Math.min(100, b.weight * 100 / top)),
+          h("span", { text: pct(b.weight, 1) }))),
+        exits.length ? h("div", { class: "sub", text: `Salió de: ${exits.join(", ")}` }) : null,
+        h("p", { class: "sub" }, "Sin calls ni puts. Llega hasta 45 días tarde: no es el libro de hoy. ", source(book.source_url, "Fuente SEC")));
+    } else empty("ai-book", "Sin informe del 13F todavía (python -m tools.ai_research all --insert).");
+
+    if (demand) {
+      const rows = Object.entries(demand.companies || {}).map(([tk, c]) => h("tr", {},
+        h("td", { text: tk }), h("td", { text: bn(c.summary.latest_usd) }),
+        h("td", { class: toneOf(c.summary.yoy_pct), text: signed(c.summary.yoy_pct, 0) }),
+        h("td", { class: toneOf(c.summary.acceleration_pp), text: c.summary.acceleration_pp === null ? "—" : `${c.summary.acceleration_pp > 0 ? "+" : ""}${num(c.summary.acceleration_pp, 0)} pp` })));
+      const p = demand.physical;
+      const quotes = Object.entries(demand.companies || {}).filter(([, c]) => c.filing?.quotes?.length)
+        .map(([tk, c]) => h("div", {}, h("b", { text: tk }), h("blockquote", { text: c.filing.quotes[0] }), source(c.filing.url, "documento")));
+      fill("ai-demand", h("h3", { text: "Demanda · capex de los compradores" }),
+        h("div", { class: "big", text: bn(demand.aggregate_buyers?.ttm_usd) }),
+        h("div", { class: "sub", text: `USD en 12 meses (${signed(demand.aggregate_buyers?.ttm_growth_pct, 0)} interanual). NVDA es proveedor y va aparte.` }),
+        h("table", { class: "ai-table" }, h("tr", {}, h("th", { text: "" }), h("th", { text: "Trimestre" }), h("th", { text: "Interanual" }), h("th", { text: "Aceleración" })), rows),
+        p ? h("div", { class: "sub", text: `≈ ${num(p.megawatts.mid, 0)} MW (${num(p.megawatts.low, 0)}–${num(p.megawatts.high, 0)}) · ${num(p.hbm_gb.mid / 1e6, 0)} M GB de HBM · ${num(p.square_feet.mid / 1e6, 0)} M pies² · ${num(p.heavy_duty_turbines.mid, 0)} turbinas grandes equivalentes. Supuestos, no datos.` }) : null,
+        quotes.length ? h("details", {}, h("summary", { text: "Qué dicen sus informes (textual)" }), quotes) : null);
+    } else empty("ai-demand", "Sin informe de demanda todavía.");
+
+    if (supply) {
+      const hd = supply.headline || {};
+      const korea = supply.korea_memory?.series || [], tw = supply.taiwan_orders?.rows || [], g = supply.gas_turbines;
+      fill("ai-supply", h("h3", { text: "Oferta física" }),
+        h("div", { class: "sub", text: `Corea · memorias exportadas, interanual (${hd.korea_memory_latest_period || "—"})` }),
+        h("div", { class: `big ${toneOf(hd.korea_memory_yoy_pct)}`, text: signed(hd.korea_memory_yoy_pct) }),
+        miniSeries(korea.map((s) => s.value_usd)),
+        h("div", { class: "sub", text: `Taiwán · pedidos de información y comunicaciones (${hd.taiwan_latest_period || "—"}): ${signed(hd.taiwan_ict_yoy_pct)}; electrónica ${signed(hd.taiwan_electronics_yoy_pct)}` }),
+        miniSeries(tw.map((r) => r.ict_usd)),
+        g ? h("div", { class: "sub", text: `GE Vernova · cartera ${bn(g.backlog_usd)} USD (${signed(g.backlog_yoy_pct)} interanual; ${num(g.backlog_years, 1)} años de ingresos)` }) : null,
+        hd.micron_capex_ttm_growth_pct !== undefined ? h("div", { class: "sub", text: `Micron · capex 12 meses ${signed(hd.micron_capex_ttm_growth_pct)} interanual` }) : null,
+        h("div", { class: "sub", text: "Cola de conexión a la red: sin fuente mensual gratuita." }));
+    } else empty("ai-supply", "Sin informe de oferta todavía.");
+
+    if (neck) {
+      fill("ai-bottleneck", h("h3", { text: "Cuello de botella" }),
+        h("div", { class: "sub", text: `${neck.title} · ${neck.as_of}` }), h("p", { class: "bottleneck", text: neck.body }));
+    } else empty("ai-bottleneck", "El informe mensual de cuello de botella aún no se ha escrito.");
+  }
+
   const THEME_NAMES = { tokenizacion: "tokenización", materias_primas: "materias primas" };
   let liqChart = null, liqSeries = null;
 
@@ -411,7 +491,7 @@
   async function refresh() {
     try {
       state = await getJSON("/api/state");
-      for (const fn of [renderStatus, renderAlerts, renderAccount, renderDuel, renderProposal, renderTimeline, renderStrategies, renderSentiment, renderNews, renderResearch, renderThemes]) {
+      for (const fn of [renderStatus, renderAlerts, renderAccount, renderDuel, renderProposal, renderTimeline, renderStrategies, renderSentiment, renderNews, renderResearch, renderThemes, renderAiThesis]) {
         try { fn(); } catch (e) { console.error(fn.name, e); }
       }
       $("updated").textContent = `Actualizado ${quitoFmt.format(new Date())} (Quito) · se refresca cada 30 s`;
