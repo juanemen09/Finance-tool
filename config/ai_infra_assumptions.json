@@ -1,0 +1,28 @@
+{
+  "_nota": "Supuestos para pasar dólares de capex a cosas físicas. No son datos: son rangos con su fuente. Cambiar un valor cambia las conversiones; la fecha de revisión queda en el informe.",
+  "revisado": "2026-09-25",
+  "datacenter_share": {
+    "low": 0.75, "mid": 0.9, "high": 1.0, "unit": "fracción del capex",
+    "source": "Estimación de Claude: el capex de estas empresas es sobre todo centros de datos y servidores, pero el de Amazon incluye logística. Sin fuente verificada; por eso el rango es amplio."
+  },
+  "cost_per_mw_usd": {
+    "low": 35000000, "mid": 50000000, "high": 60000000, "unit": "USD por MW de instalación, todo incluido (edificio, energía, refrigeración, GPU y red)",
+    "source": "Bernstein ~35 mil M USD por GW (https://www.investing.com/news/stock-market-news/how-much-does-a-gw-of-data-center-capacity-actually-cost-4314046); Nvidia 50-60 mil M USD por GW (https://cryptobriefing.com/nvidia-g20-ai-infrastructure-investment/)"
+  },
+  "hbm_gb_per_it_mw": {
+    "low": 104727, "mid": 125000, "high": 146028, "unit": "GB de HBM por MW de carga de TI",
+    "source": "GB200 NVL72: 72 × 192 GB = 13 824 GB por rack de ~132 kW; GB300 NVL72: ~20 736 GB por rack de ~142 kW (https://www.spheron.network/blog/nvidia-gb200-nvl72-guide/, https://www.moduledge.com/blog/gb300-nvl72). Solo cuenta la HBM de las GPU, no la DRAM de los servidores."
+  },
+  "pue": {
+    "low": 1.1, "mid": 1.2, "high": 1.4, "unit": "potencia de la instalación ÷ potencia de TI",
+    "source": "Rango típico de centros de datos de hiperescala nuevos; estimación de Claude, sin fuente verificada."
+  },
+  "sqft_per_mw": {
+    "low": 1500, "mid": 3000, "high": 5000, "unit": "pies² de edificio por MW",
+    "source": "Un centro de hiperescala típico: ~435 000 pies² y ≥100 MW, unos 4 350 pies² por MW (https://www.aitooldiscovery.com/ai-infra/hyperscale-data-center-explained); los racks de IA son más densos, por eso el rango baja. Muy incierto."
+  },
+  "turbine_mw": {
+    "heavy_duty": 430, "aeroderivative": 50, "unit": "MW por turbina",
+    "source": "GE Vernova 7HA.03: 430 MW en ciclo simple (https://www.gevernova.com/gas-power/products/gas-turbines/7ha); LM6000: clase de 40-50 MW (https://www.gevernova.com/gas-power/products/gas-turbines/lm6000)"
+  }
+}

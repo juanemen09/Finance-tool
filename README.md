@@ -54,6 +54,17 @@ El ciclo horario inserta los titulares con un rol que solo puede **añadir** fil
 
 Sin esa línea, el recolector sigue funcionando en el modo anterior (genera el SQL para que lo ejecute el agente).
 
+### Tesis de infraestructura de IA (13F, demanda y oferta)
+
+```bash
+python -m tools.ai_research all --insert
+```
+
+Usa el mismo rol `lab_ingest`, que también puede añadir filas en `research_facts` y `research_reports`. La SEC
+exige un contacto en el User-Agent, así que en `.env` va `SEC_USER_AGENT=Nombre correo@ejemplo.com`; ese valor solo
+se envía a sec.gov. Para ver la lista de órdenes hipotética del libro 13F:
+`python -m tools.ai_research book --notional 1000`. No envía nada. Plan en `docs/plans/ai-infra-research.md`.
+
 ## Pruebas
 
 ```bash

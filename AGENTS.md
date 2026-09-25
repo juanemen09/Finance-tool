@@ -162,6 +162,25 @@ Reglas:
 - Acciones de empresas tokenizadoras o materias primas no se operan aquí (solo Spot de Binance, universo de 5
   pares): si aparece un hallazgo, se informa al usuario y la decisión es suya.
 
+## Tesis de infraestructura de IA (pedido del usuario, 2026-09-25)
+
+Detalle en `docs/plans/ai-infra-research.md`. Con `python -m tools.ai_research all --insert`, Claude guarda en
+`research_facts` (hechos con fuente) y en `research_reports` (informes, uno nuevo solo cuando cambian los datos) lo
+siguiente:
+
+- **Libro 13F** de Situational Awareness LP (CIK 0002045724): acciones en largo, sus pesos y los cambios frente al
+  trimestre anterior. `--notional N` da una lista de órdenes **hipotética**. Nadie la ejecuta: aquí no se operan acciones.
+- **Demanda:** capex trimestral de MSFT, AMZN, GOOGL, META y ORCL (XBRL de la SEC), con frases textuales de sus informes
+  y su equivalente en MW, GB de HBM, pies² y turbinas según `config/ai_infra_assumptions.json` (supuestos con rango y
+  fuente, no datos). NVDA va aparte porque es proveedor.
+- **Oferta:** exportaciones de memorias de Corea (Comtrade), pedidos de exportación de Taiwán (Ministerio de Economía),
+  cartera pendiente de GE Vernova (turbinas) y capex de Micron. La cola de conexión a la red no tiene fuente
+  gratuita legible por máquina.
+- **Cuello de botella (mensual, informe `AI_BOTTLENECK`):** lo escribe Claude a partir de los dos informes. Nombra el
+  insumo cuya demanda acelera más y cuya oferta tiene menos margen, quién lo controla y qué lo resolvería, y lo
+  compara con el mes anterior.
+- Es investigación: no respalda operaciones, no pasa por el hard testing y el 13F llega hasta 45 días tarde.
+
 ## Autorización permanente con ventana de veto
 
 Aplicada por el usuario el 2026-09-24 (`standing_authorizations`, fila vigente = la última). Una propuesta
