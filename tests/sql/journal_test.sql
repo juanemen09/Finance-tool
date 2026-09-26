@@ -69,8 +69,13 @@ do $$ begin
   assert not exists (select 1 from v_executable_proposals where proposal_id = 'P-1'), 'WAIT no debe ser ejecutable';
 end $$;
 
+-- Desde el 2026-09-26 la autorización dada ANTES del APPROVE también vale (decisión del usuario).
 insert into risk_reviews (review_id, proposal_id, reviewer_agent_id, verdict, market_data_as_of, reasoning)
 values ('R-2', 'P-1', 'claude', 'APPROVE', now(), 'retesteo confirmado');
+do $$ begin
+  assert (select authorization_mode from v_executable_proposals where proposal_id = 'P-1') = 'USER',
+    'la autorización previa al APPROVE debe contar';
+end $$;
 insert into execution_authorizations (proposal_id, authorized_by, recorded_by_agent_id, user_message_quote)
 values ('P-1', 'user', 'chatgpt', 'autorizo P-1');
 do $$ begin

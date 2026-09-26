@@ -71,6 +71,8 @@ Cualquiera de los dos agentes puede proponer. El otro revisa, el usuario autoriz
    mensaje. Nadie revisa su propia propuesta. `APPROVE` es solo análisis.
 3. El usuario autoriza en el chat, con Claude o con Codex. El agente que recibe la autorización la registra
    en `execution_authorizations` citando el mensaje del usuario, y si no es el ejecutor, avisa con un `ALERT`.
+   Desde el 2026-09-26 vale aunque llegue antes de la revisión: basta con que el último veredicto del otro agente
+   sea `APPROVE` y no haya veto.
 4. **El ejecutor solo opera propuestas con `status = 'READY_TO_EXECUTE'` en `v_proposal_status`.** Justo antes
    de enviar la orden comprueba de nuevo precio, saldo y que la propuesta siga ahí: si el precio ya salió de
    la zona de entrada, no ejecuta y lo registra.
@@ -191,7 +193,9 @@ devuelve `auto_ok = true`, es decir, si se cumplen TODAS estas condiciones:
 - último veredicto del otro agente = `APPROVE`, y pasaron `veto_minutes` desde ese veredicto (1 minuto desde el
   2026-09-26 por decisión del usuario; antes 15);
 - sin veto del usuario (`user_vetoes`), no expirada y no ejecutada;
-- pérdida estimada hasta `invalidation` (con comisión y deslizamiento) ≤ 0,8 USDT;
+- pérdida estimada hasta `invalidation` (con comisión y deslizamiento) ≤ 0,8 USDT. Para que quepa, el tamaño de
+  cada compra se calcula con `ai_trading_lab.sizing.auto_notional` (lo da `tools.strategy_signals`): se achica
+  desde 7 USDT hasta el tope, sin bajar del mínimo operable de Binance para la venta del stop;
 - relación riesgo/beneficio a `targets[1]` ≥ 1,5;
 - pérdidas cerradas de los últimos 7 días > -1 USDT;
 - ninguna alerta `permissions_review` abierta (permisos del ejecutor corregidos) y ninguna posición abierta.
