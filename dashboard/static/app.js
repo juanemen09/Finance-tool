@@ -16,7 +16,7 @@
     standing_authorization_active: "Autorización permanente activa",
     strategy_live_eligible: "Estrategia validada",
     reviewed_approve: "Revisión APPROVE",
-    veto_window_elapsed: "Pasaron 15 min de veto",
+    veto_window_elapsed: "Pasó la ventana de veto",
     not_vetoed: "Sin veto",
     not_expired: "No expirada",
     max_loss_ok: "Pérdida ≤ máximo",

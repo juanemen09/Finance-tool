@@ -188,7 +188,8 @@ queda ejecutable **sin** el "autorizo" del usuario solo si `auto_authorization_s
 devuelve `auto_ok = true`, es decir, si se cumplen TODAS estas condiciones:
 
 - estrategia `LIVE_ELIGIBLE` (`trade_proposals.strategy_id`);
-- último veredicto del otro agente = `APPROVE`, y pasaron 15 minutos desde ese veredicto;
+- último veredicto del otro agente = `APPROVE`, y pasaron `veto_minutes` desde ese veredicto (5 minutos desde el
+  2026-09-26 por decisión del usuario; antes 15);
 - sin veto del usuario (`user_vetoes`), no expirada y no ejecutada;
 - pérdida estimada hasta `invalidation` (con comisión y deslizamiento) ≤ 0,8 USDT;
 - relación riesgo/beneficio a `targets[1]` ≥ 1,5;
@@ -198,7 +199,7 @@ devuelve `auto_ok = true`, es decir, si se cumplen TODAS estas condiciones:
 `v_executable_proposals.authorization_mode` dice si la autorización fue del usuario (`USER`) o permanente
 (`STANDING`). **Veto:** si el usuario escribe a cualquier agente "veto <proposal_id>", ese agente inserta en
 `user_vetoes` citando el mensaje, inmediatamente. Cuando un agente aprueba una propuesta, el correo al usuario
-debe decir que tiene 15 minutos para vetarla. Nada de esto cambia la regla de salida: los stops y las salidas
+debe decir que tiene 5 minutos para vetarla (lo que diga la última fila de `standing_authorizations`). Nada de esto cambia la regla de salida: los stops y las salidas
 por señal nunca requieren autorización.
 
 ## Desacuerdos
