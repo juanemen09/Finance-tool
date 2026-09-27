@@ -1,0 +1,138 @@
+{
+  "_comment": "Roles del equipo humano y pasos del onboarding. Lo lee `python -m team`. Los recursos siguen el formato <servicio>:<proyecto>:<nivel>; la base rechaza binance:*, journal:* y cualquier supabase:finance-tool:* que no sea read (ver supabase/migrations/20260927010000_team_members.sql). El fundador no es un rol: es 'el usuario' de AGENTS.md.",
+  "roles": [
+    {
+      "id": "observer",
+      "name": "Observador / en formación",
+      "summary": "Aprende cómo funciona la startup leyendo el código y la documentación. No toca datos.",
+      "grants": ["github:finance-tool:read"],
+      "optional_grants": []
+    },
+    {
+      "id": "analyst",
+      "name": "Analista de investigación",
+      "summary": "Estudia mercado, estrategias e investigación; lee el diario y el centro de mando; practica análisis y propone fuentes al fundador.",
+      "grants": ["github:finance-tool:read", "supabase:finance-tool:read", "dashboard:finance-tool"],
+      "optional_grants": []
+    },
+    {
+      "id": "developer",
+      "name": "Desarrollador",
+      "summary": "Construye y prueba código en los repos que se le asignen; todo cambio entra por pull request revisado por el fundador.",
+      "grants": ["github:finance-tool:write", "supabase:finance-tool:read", "dashboard:finance-tool"],
+      "optional_grants": ["github:praxiguard:read", "github:praxiguard:write", "github:zyneath:read",
+                          "github:zyneath:write", "vercel:praxiguard:member"]
+    }
+  ],
+  "steps": [
+    {
+      "id": "cuenta-github",
+      "when": "dia-1",
+      "title": "Cuenta de GitHub con verificación en dos pasos",
+      "detail": "Activa 2FA (Settings → Password and authentication) y envía tu usuario de GitHub al fundador.",
+      "roles": []
+    },
+    {
+      "id": "aceptar-invitacion",
+      "when": "dia-1",
+      "title": "Acepta las invitaciones a los repos",
+      "detail": "Llegan por correo o en https://github.com/notifications. Solo verás los repos privados que te correspondan.",
+      "roles": []
+    },
+    {
+      "id": "leer-reglas",
+      "when": "dia-1",
+      "title": "Lee las reglas de oro y el protocolo",
+      "detail": "docs/team/README.md (reglas de oro y forma de trabajo), README.md y AGENTS.md. Las reglas del fundador mandan sobre todo.",
+      "roles": []
+    },
+    {
+      "id": "entorno-local",
+      "when": "dia-1",
+      "title": "Prepara tu entorno local",
+      "detail": "Clona el repo, crea un entorno virtual e instala dependencias. Luego comprueba todo con el doctor. En Windows activa el entorno con .venv\\Scripts\\activate en lugar de . .venv/bin/activate.",
+      "command": "git clone https://github.com/juanemen09/Finance-tool && cd Finance-tool && python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt && python -m team doctor",
+      "roles": []
+    },
+    {
+      "id": "mapa-del-stack",
+      "when": "semana-1",
+      "title": "Recorre el mapa de herramientas de tu rol",
+      "detail": "Abre cada enlace, sobre todo los de 'Para aprender'. No hace falta dominarlos: saber para qué sirve cada uno.",
+      "command": "python -m team stack --role {role}",
+      "roles": []
+    },
+    {
+      "id": "pruebas",
+      "when": "semana-1",
+      "title": "Corre las pruebas",
+      "detail": "Si alguna falla en tu PC, avisa: es información útil, no un error tuyo.",
+      "command": "python -m unittest discover -s tests -t .",
+      "roles": []
+    },
+    {
+      "id": "panel",
+      "when": "semana-1",
+      "title": "Abre el centro de mando con tu rol personal",
+      "detail": "El fundador te da la contraseña de team_{handle} en persona o por un gestor de contraseñas (nunca por chat). Añade a tu .env la línea DASHBOARD_DATABASE_URL con ese rol (ver README.md, 'Centro de mando') y ejecuta el panel.",
+      "command": "python -m dashboard",
+      "roles": ["analyst", "developer"],
+      "requires_grant": "dashboard:finance-tool"
+    },
+    {
+      "id": "diario-lectura",
+      "when": "semana-1",
+      "title": "Lee el diario como lo leen los agentes",
+      "detail": "Con tu rol de solo lectura, ejecuta las consultas de 'Al empezar cada sesión' de AGENTS.md (psql o el SQL Editor si te dan acceso). Sigue una propuesta de principio a fin: analyses → trade_proposals → risk_reviews → trades.",
+      "roles": ["analyst", "developer"],
+      "requires_grant": "supabase:finance-tool"
+    },
+    {
+      "id": "pipeline-estrategias",
+      "when": "semana-1",
+      "title": "Entiende el pipeline de estrategias",
+      "detail": "Lee docs/plans/strategy-pipeline.md y mira la foto del mercado. Pregunta por qué S-CHANNEL-1D pasó y el momentum diario no.",
+      "command": "python -m tools.market_scan",
+      "roles": ["analyst"]
+    },
+    {
+      "id": "analisis-practica",
+      "when": "semana-2",
+      "title": "Escribe un análisis de práctica",
+      "detail": "Con los mismos campos que la tabla analyses (tesis, evidencia, contraargumentos, acción, niveles), en un archivo tuyo, no en la base. Compáralo luego con los de Claude y Codex del mismo ciclo.",
+      "command": "python -m tools.strategy_signals",
+      "roles": ["analyst"]
+    },
+    {
+      "id": "esquema-sql",
+      "when": "semana-2",
+      "title": "Corre las pruebas del esquema",
+      "detail": "Postgres en Docker, todo dentro de una transacción que se revierte (README.md, 'Pruebas'). Incluye tests/sql/team_members_test.sql.",
+      "roles": ["developer"]
+    },
+    {
+      "id": "demo-praxiguard",
+      "when": "semana-2",
+      "title": "Levanta la demo de PraxiGuard",
+      "detail": "Sigue SETUP.md del repo. Solo datos ficticios: nunca información real de pacientes.",
+      "command": "npm ci && npm run dev:care",
+      "roles": ["developer"],
+      "requires_grant": "github:praxiguard"
+    },
+    {
+      "id": "primer-pr",
+      "when": "semana-2",
+      "title": "Tu primer pull request",
+      "detail": "Algo pequeño: una mejora de documentación o una prueba. Rama propia, pruebas en verde y descripción clara. Lo revisa el fundador.",
+      "command": "git switch -c {handle}/primer-cambio",
+      "roles": ["analyst", "developer"]
+    },
+    {
+      "id": "presentacion",
+      "when": "semana-2",
+      "title": "Cuenta lo que aprendiste",
+      "detail": "Quince minutos con el fundador: qué entendiste, qué no, y qué te gustaría construir o investigar.",
+      "roles": []
+    }
+  ]
+}

@@ -1,0 +1,318 @@
+{
+  "_comment": "Inventario de lo que usa la startup. Lo lee `python -m team`. docs/team/stack.md se genera desde aquí (python -m team stack --markdown > docs/team/stack.md). Este repositorio es PÚBLICO: nada de claves, datos personales ni detalles internos de los repos privados; eso va en config/team/stack.private.json, que git ignora. roles vacío = todos los roles.",
+  "items": [
+    {
+      "id": "finance-tool",
+      "kind": "repo",
+      "name": "Finance-tool (AI Trading Lab)",
+      "url": "https://github.com/juanemen09/Finance-tool",
+      "visibility": "public",
+      "what": "Laboratorio de trading asistido por IA en Binance Spot: diario compartido en Supabase, hard testing de estrategias, sentimiento, tesis de infraestructura de IA y centro de mando local.",
+      "stack": "Python 3.11, PostgreSQL (Supabase), HTML/JS sin framework",
+      "start": "README.md, AGENTS.md y docs/team/README.md",
+      "roles": []
+    },
+    {
+      "id": "praxiguard",
+      "kind": "repo",
+      "name": "PraxiGuard",
+      "url": "https://github.com/juanemen09/praxiguard",
+      "visibility": "private",
+      "what": "Producto web para clínicas. Hoy es una demostración con datos ficticios.",
+      "stack": "TypeScript, Next.js, React, Supabase",
+      "start": "README.md y SETUP.md del propio repo (requiere acceso)",
+      "roles": ["developer"]
+    },
+    {
+      "id": "zyneath",
+      "kind": "repo",
+      "name": "Zyneath",
+      "url": "https://github.com/juanemen09/Zyneath-Private-Coding",
+      "visibility": "private",
+      "what": "Sistema personal de inteligencia de inversión, en fase 0 y de solo lectura.",
+      "stack": "Python 3.11",
+      "start": "README.md del propio repo (requiere acceso)",
+      "roles": ["developer"]
+    },
+
+    {
+      "id": "github",
+      "kind": "app",
+      "name": "GitHub",
+      "url": "https://github.com",
+      "what": "Código, ramas, pull requests y revisión.",
+      "used_for": "Todo cambio entra por una rama y un pull request que revisa el fundador. main es lo que leen los agentes.",
+      "access": "Cuenta propia con verificación en dos pasos; el fundador te invita a cada repo con el permiso de tu rol.",
+      "learn": "https://docs.github.com/es/get-started/start-your-journey",
+      "roles": []
+    },
+    {
+      "id": "claude",
+      "kind": "app",
+      "name": "Claude y Claude Code (Anthropic)",
+      "url": "https://claude.ai",
+      "what": "Agente de investigación y riesgo del laboratorio; también el asistente de programación del equipo.",
+      "used_for": "En Finance-tool, Claude analiza cada hora, revisa propuestas y puede vetar; no ejecuta. Para programar, Claude Code trabaja sobre los repos.",
+      "access": "Cuenta propia. Nunca uses la del fundador: tiene conectores a Binance, Supabase y Gmail.",
+      "learn": "https://code.claude.com/docs",
+      "roles": []
+    },
+    {
+      "id": "chatgpt",
+      "kind": "app",
+      "name": "ChatGPT / Codex (OpenAI)",
+      "url": "https://chatgpt.com",
+      "what": "Agente de trading y ejecución: el único que envía órdenes a Binance.",
+      "used_for": "Propone, revisa las propuestas de Claude y ejecuta las que quedan READY_TO_EXECUTE. Su prompt de arranque está en docs/codex-onboarding.md.",
+      "access": "Cuenta propia si la necesitas para programar. La cuenta de Codex con permiso de trading es solo del fundador.",
+      "learn": "https://developers.openai.com/codex",
+      "roles": []
+    },
+    {
+      "id": "supabase",
+      "kind": "app",
+      "name": "Supabase",
+      "url": "https://supabase.com",
+      "what": "Postgres gestionado. En Finance-tool es el diario compartido y append-only entre agentes.",
+      "used_for": "Historia, propuestas, revisiones, trades, estrategias, sentimiento, investigación y el registro del equipo (team_members).",
+      "access": "Rol personal de solo lectura team_<tu_handle> (lo crea el fundador). Nunca la clave service_role.",
+      "learn": "https://supabase.com/docs",
+      "roles": ["analyst", "developer"]
+    },
+    {
+      "id": "binance",
+      "kind": "app",
+      "name": "Binance (subcuenta agéntica, Spot)",
+      "url": "https://www.binance.com",
+      "what": "El exchange donde opera el laboratorio. Es la fuente de verdad de precios, saldos y órdenes.",
+      "used_for": "Solo la usan los agentes: Claude en solo lectura y Codex con trading Spot. Sin margen, préstamos ni futuros.",
+      "access": "Ninguno para miembros del equipo; la base rechaza concederlo. Los precios públicos se consultan sin cuenta.",
+      "learn": "https://developers.binance.com/docs/binance-spot-api-docs",
+      "roles": []
+    },
+    {
+      "id": "gmail",
+      "kind": "app",
+      "name": "Gmail",
+      "url": "https://mail.google.com",
+      "what": "Canal de alertas de los agentes al fundador.",
+      "used_for": "Avisos IMPORTANTES: propuestas aprobadas con su ventana de veto y órdenes de respaldo si el ejecutor no responde.",
+      "access": "Solo el fundador.",
+      "roles": []
+    },
+    {
+      "id": "vercel",
+      "kind": "app",
+      "name": "Vercel",
+      "url": "https://vercel.com",
+      "what": "Hosting de las aplicaciones web (Next.js).",
+      "used_for": "Despliegue de PraxiGuard.",
+      "access": "Lo da el fundador cuando haga falta desplegar.",
+      "learn": "https://vercel.com/docs",
+      "roles": ["developer"]
+    },
+    {
+      "id": "docker",
+      "kind": "app",
+      "name": "Docker",
+      "url": "https://www.docker.com",
+      "what": "Contenedores para correr Postgres y Supabase en tu PC.",
+      "used_for": "Pruebas del esquema de Finance-tool (Postgres 17) y Supabase local de PraxiGuard.",
+      "access": "Instalación local (Docker Desktop).",
+      "learn": "https://docs.docker.com/get-started/",
+      "roles": ["developer"]
+    },
+
+    {
+      "id": "python",
+      "kind": "open_source",
+      "name": "Python 3.11+",
+      "url": "https://www.python.org",
+      "license": "PSF-2.0",
+      "used_for": "Lenguaje de Finance-tool y Zyneath. Las pruebas usan unittest de la biblioteca estándar.",
+      "where": ["finance-tool", "zyneath"],
+      "learn": "https://docs.python.org/es/3/tutorial/",
+      "roles": []
+    },
+    {
+      "id": "numpy",
+      "kind": "open_source",
+      "name": "NumPy",
+      "url": "https://github.com/numpy/numpy",
+      "license": "BSD-3-Clause",
+      "used_for": "Indicadores, backtest y validación estadística (ai_trading_lab/).",
+      "where": ["finance-tool"],
+      "learn": "https://numpy.org/doc/stable/user/absolute_beginners.html",
+      "roles": ["analyst", "developer"]
+    },
+    {
+      "id": "vadersentiment",
+      "kind": "open_source",
+      "name": "vaderSentiment",
+      "url": "https://github.com/cjhutto/vaderSentiment",
+      "license": "MIT",
+      "used_for": "Tono de los titulares, con un léxico cripto propio (ai_trading_lab/sentiment.py).",
+      "where": ["finance-tool"],
+      "roles": ["analyst", "developer"]
+    },
+    {
+      "id": "psycopg",
+      "kind": "open_source",
+      "name": "psycopg 3",
+      "url": "https://github.com/psycopg/psycopg",
+      "license": "LGPL-3.0",
+      "used_for": "Conexión a Postgres del centro de mando y de la ingesta.",
+      "where": ["finance-tool"],
+      "roles": ["developer"]
+    },
+    {
+      "id": "lightweight-charts",
+      "kind": "open_source",
+      "name": "TradingView Lightweight Charts",
+      "url": "https://github.com/tradingview/lightweight-charts",
+      "license": "Apache-2.0",
+      "used_for": "Gráfico de velas del centro de mando (copia en dashboard/static/vendor).",
+      "where": ["finance-tool"],
+      "roles": ["developer"]
+    },
+    {
+      "id": "postgresql",
+      "kind": "open_source",
+      "name": "PostgreSQL",
+      "url": "https://www.postgresql.org",
+      "license": "PostgreSQL",
+      "used_for": "La base de todo: tablas append-only, vistas de estado y reglas que valida la propia base.",
+      "where": ["finance-tool", "praxiguard"],
+      "learn": "https://www.postgresql.org/docs/current/tutorial.html",
+      "roles": ["analyst", "developer"]
+    },
+    {
+      "id": "supabase-oss",
+      "kind": "open_source",
+      "name": "Supabase (CLI y supabase-js)",
+      "url": "https://github.com/supabase/supabase",
+      "license": "Apache-2.0 / MIT",
+      "used_for": "Supabase local para desarrollo y cliente en la web.",
+      "where": ["praxiguard"],
+      "roles": ["developer"]
+    },
+    {
+      "id": "nodejs",
+      "kind": "open_source",
+      "name": "Node.js y TypeScript",
+      "url": "https://nodejs.org",
+      "license": "MIT / Apache-2.0",
+      "used_for": "Entorno y lenguaje de las aplicaciones web.",
+      "where": ["praxiguard"],
+      "learn": "https://www.typescriptlang.org/docs/handbook/intro.html",
+      "roles": ["developer"]
+    },
+    {
+      "id": "nextjs",
+      "kind": "open_source",
+      "name": "Next.js y React",
+      "url": "https://github.com/vercel/next.js",
+      "license": "MIT",
+      "used_for": "Framework web.",
+      "where": ["praxiguard"],
+      "learn": "https://nextjs.org/learn",
+      "roles": ["developer"]
+    },
+    {
+      "id": "ai-sdk",
+      "kind": "open_source",
+      "name": "Vercel AI SDK",
+      "url": "https://github.com/vercel/ai",
+      "license": "Apache-2.0",
+      "used_for": "Llamadas a modelos de lenguaje desde la web.",
+      "where": ["praxiguard"],
+      "roles": ["developer"]
+    },
+    {
+      "id": "zod",
+      "kind": "open_source",
+      "name": "Zod",
+      "url": "https://github.com/colinhacks/zod",
+      "license": "MIT",
+      "used_for": "Validación de datos de entrada.",
+      "where": ["praxiguard"],
+      "roles": ["developer"]
+    },
+    {
+      "id": "web-testing",
+      "kind": "open_source",
+      "name": "Vitest, Playwright y ESLint",
+      "url": "https://playwright.dev",
+      "license": "MIT / Apache-2.0",
+      "used_for": "Pruebas unitarias, pruebas de navegador y lint.",
+      "where": ["praxiguard"],
+      "roles": ["developer"]
+    },
+    {
+      "id": "python-security",
+      "kind": "open_source",
+      "name": "requests, PyJWT y cryptography",
+      "url": "https://github.com/pyca/cryptography",
+      "license": "Apache-2.0 / MIT / BSD",
+      "used_for": "HTTP y firma de peticiones. Pocas dependencias a propósito: cada paquete es una puerta de entrada.",
+      "where": ["zyneath"],
+      "roles": ["developer"]
+    },
+    {
+      "id": "python-tooling",
+      "kind": "open_source",
+      "name": "pytest y Ruff",
+      "url": "https://github.com/astral-sh/ruff",
+      "license": "MIT",
+      "used_for": "Pruebas y lint.",
+      "where": ["zyneath"],
+      "roles": ["developer"]
+    },
+
+    {
+      "id": "binance-public",
+      "kind": "data_source",
+      "name": "Binance: API pública y data.binance.vision",
+      "url": "https://data.binance.vision",
+      "used_for": "Velas en vivo (api.binance.com) e histórico oficial verificado por SHA-256 para el hard testing. Funding y largo/corto de futuros solo como dato.",
+      "where": ["finance-tool"],
+      "roles": ["analyst", "developer"]
+    },
+    {
+      "id": "sentiment-sources",
+      "kind": "data_source",
+      "name": "Sentimiento: Fear & Greed, RSS y Bluesky",
+      "url": "https://alternative.me/crypto/fear-and-greed-index/",
+      "used_for": "Contexto, no señal: alternative.me, CoinDesk, Cointelegraph, Decrypt, r/CryptoCurrency, OilPrice, CNBC, Investing.com y Bluesky (tools/ingest_sentiment.py).",
+      "where": ["finance-tool"],
+      "roles": ["analyst"]
+    },
+    {
+      "id": "defillama",
+      "kind": "data_source",
+      "name": "DefiLlama",
+      "url": "https://defillama.com",
+      "used_for": "Oferta de stablecoins y TVL de activos del mundo real tokenizados.",
+      "where": ["finance-tool"],
+      "roles": ["analyst"]
+    },
+    {
+      "id": "arxiv",
+      "kind": "data_source",
+      "name": "arXiv (q-fin)",
+      "url": "https://arxiv.org/list/q-fin/new",
+      "used_for": "Ingesta semanal de papers de estrategias (tools/ingest_sources.py). Quantpedia y SSRN entran a mano.",
+      "where": ["finance-tool"],
+      "roles": ["analyst"]
+    },
+    {
+      "id": "ai-infra-sources",
+      "kind": "data_source",
+      "name": "Tesis de IA: SEC EDGAR, UN Comtrade, MOEA de Taiwán, GE Vernova, OpenFIGI",
+      "url": "https://www.sec.gov/edgar/search/",
+      "used_for": "13F, capex de los compradores de IA y oferta física (tools/ai_research.py, docs/plans/ai-infra-research.md).",
+      "where": ["finance-tool"],
+      "roles": ["analyst"]
+    }
+  ]
+}

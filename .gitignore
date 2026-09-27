@@ -5,3 +5,5 @@ __pycache__/
 data/raw/
 
 .claude/settings.local.json
+config/team/stack.private.json
+team_local/
