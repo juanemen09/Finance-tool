@@ -54,10 +54,16 @@ select * from v_proposal_status where status not in ('EXECUTED', 'EXPIRED') orde
 - Para pedir algo al otro agente: `insert into agent_messages (from_agent_id, to_agent_id, kind, related_ref, body, expires_at)`.
   `kind`: `REVIEW_REQUEST`, `REVIEW_DONE`, `EXECUTION_DONE`, `ALERT`, `INFO`.
 - Al atenderlo: `insert into message_acks (message_id, acked_by_agent_id, outcome)`. Solo el destinatario puede hacerlo.
-- Frecuencia: Claude revisa cada hora (minuto :06, tras el cierre de 1h). ChatGPT/Codex, una vez por hora al
-  minuto :15 y además cada 15 minutos de 00:15 a 01:45 UTC (19:15-20:45 en Quito), la ventana tras el cierre diario
-  donde nacen propuestas, revisiones, vetos y ejecuciones. Si no hay nada pendiente y su análisis del ciclo ya
-  existe, termina sin analizar. Una propuesta se revisa en menos de 1h: ponle un `expires_at` realista.
+- Frecuencia: Claude revisa cada hora (minuto :06, tras el cierre de 1h). ChatGPT/Codex (desde el 2026-09-27,
+  tras agotar su límite de uso): cada 15 minutos de 00:15 a 01:45 UTC (19:15-20:45 en Quito), la ventana tras el
+  cierre diario donde nacen propuestas, revisiones, vetos, ejecuciones y salidas de las estrategias diarias, y el
+  resto del día cada 4 horas (04:15, 08:15, 12:15, 16:15 y 20:15 UTC) solo para el buzón y las posiciones.
+  Codex escribe su análisis a ciegas una vez al día (ciclo 00Z), no cada hora. Si no hay nada pendiente, termina
+  sin analizar. Los stops están puestos en Binance, así que una posición no queda desprotegida entre ejecuciones.
+- **Si el ejecutor no responde** (una propuesta `READY_TO_EXECUTE` o una salida por señal sin atender 30 minutos
+  después de la ventana, o Codex sin actividad en el diario durante más de 5 horas), Claude manda un correo
+  IMPORTANTE al usuario con la orden exacta para hacerla él mismo en la app de Binance (par, lado, cantidad,
+  precio límite y stop). Claude no ejecuta: solo prepara la orden.
 
 ## De la propuesta a la ejecución
 

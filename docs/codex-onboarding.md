@@ -78,18 +78,20 @@ Tú **no decides** si aplica: consulta `select auto_authorization_status('<propo
 transferencia en Binance), la aprobación automática está bloqueada: recuérdame reconectarte.
 
 ## Automatización que te pido crear
-Ritmo (actualizado el 2026-09-24 para ahorrar uso: de 96 a 28 ejecuciones al día). Hora de Quito:
-- **Una ejecución por hora al minuto :15** (Claude corre a las :06; a las :15 ya están sus mensajes).
-- **Además, cada 15 minutos de 19:15 a 20:45**: es la ventana tras el cierre diario de las 00:00 UTC, cuando
-  nacen las propuestas de las estrategias diarias, se revisan, pasa el minuto de veto y se ejecutan.
-- Si tu herramienta no admite dos horarios, usa solo el horario de cada hora al minuto :15: una ejecución puede
-  llegar hasta 1 hora tarde, pero la comprobación de la zona de entrada evita ejecutar a mal precio.
+Ritmo (actualizado el 2026-09-27 porque se agotó tu límite de uso: de 28 a 12 ejecuciones al día). Hora de Quito:
+- **Cada 15 minutos de 19:15 a 20:45** (7 ejecuciones): es la ventana tras el cierre diario de las 00:00 UTC,
+  cuando nacen las propuestas y las salidas de las estrategias diarias, se revisan, pasa el minuto de veto y se
+  ejecutan. Es la única parte del día en la que las estrategias validadas deciden algo.
+- **El resto del día, cada 4 horas** (23:15, 03:15, 07:15, 11:15 y 15:15): buzón, propuestas y posiciones. Los
+  stops están puestos en Binance, así que una posición no queda desprotegida entre ejecuciones.
+- Tu análisis a ciegas se escribe **una vez al día**, en la ejecución de las 19:15 (ciclo 00Z). En las demás no
+  analices: es lo que más uso consumía.
 
 En cada ejecución:
 1. Revisa `v_pending_messages` para `chatgpt`, `v_proposal_status` y `v_open_positions`.
 2. **Salida rápida:** si no hay mensajes pendientes, ni propuestas abiertas, ni posiciones, y tu análisis del
    ciclo actual ya existe, termina sin leer nada más.
-3. Si tu análisis del ciclo actual (hora UTC del último cierre de 1h) no existe, escríbelo en `analyses`
+3. Solo en la ejecución de las 19:15: si tu análisis del ciclo 00Z no existe, escríbelo en `analyses`
    (competición a ciegas: antes de leer el de Claude de ese ciclo).
 4. Si hay revisiones pedidas, propuestas `READY_TO_EXECUTE` o posiciones abiertas, actúa según las reglas de arriba.
 5. Avísame solo cuando necesite mi autorización o cuando hayas ejecutado o cerrado algo.
