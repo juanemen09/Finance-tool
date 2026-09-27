@@ -55,6 +55,13 @@
       "roles": []
     },
     {
+      "id": "kit-ia",
+      "when": "dia-1",
+      "title": "Configura tus herramientas de IA",
+      "detail": "Activa las skills y conecta los conectores de tu rol con tus propias cuentas, según docs/team/ai-toolkit.md. Nunca Binance, Supabase, Stripe ni Inkbox, y nunca la cuenta del fundador.",
+      "roles": []
+    },
+    {
       "id": "mapa-del-stack",
       "when": "semana-1",
       "title": "Recorre el mapa de herramientas de tu rol",

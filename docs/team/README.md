@@ -16,6 +16,8 @@ Somos una startup pequeña que trabaja con agentes de IA como compañeros de equ
 
 El mapa completo de repositorios, aplicaciones, proyectos open source y fuentes de datos está en
 [stack.md](stack.md) (o en tu terminal: `python -m team stack --role <tu rol>`).
+Las skills, conectores y plugins de Claude que usa el equipo, y cuáles activar según tu rol, están en
+[ai-toolkit.md](ai-toolkit.md).
 
 ## Quién es quién
 
