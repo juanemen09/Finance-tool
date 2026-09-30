@@ -7,4 +7,5 @@ data/raw/
 .claude/settings.local.json
 config/team/stack.private.json
 config/workspace.local.json
+data/predicciones/
 team_local/

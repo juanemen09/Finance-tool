@@ -19,6 +19,7 @@ from dashboard.market import CandleCache, LiquidityCache, RadarCache
 from dashboard.queries import build_state
 from dashboard.server import make_server
 from dashboard.workspace import WorkspaceCache
+from tools import predicciones
 
 STATE_SECONDS = 20
 
@@ -76,7 +77,7 @@ def main():
     try:
         server = make_server(args.port, state_provider=CachedState(ReadOnlyDatabase(url)), candles_provider=candles.get,
                              liquidity_provider=LiquidityCache().get, radar_provider=RadarCache().get,
-                             workspace_provider=WorkspaceCache().get)
+                             workspace_provider=WorkspaceCache().get, predictions=predicciones)
     except OSError:
         sys.exit(f"El puerto {args.port} ya está en uso: probablemente el panel ya está abierto. Ciérralo o usa --port.")
     address = f"http://127.0.0.1:{server.server_address[1]}/"

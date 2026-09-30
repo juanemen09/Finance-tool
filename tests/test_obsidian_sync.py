@@ -41,6 +41,24 @@ class NotesTest(unittest.TestCase):
         self.assertIn("Personas/Ana.md", self.notes)
 
 
+class MindTest(unittest.TestCase):
+    def test_memory_is_split_into_linked_memories(self):
+        from tools.obsidian_sync import autolinks, mind_notes, split_memory
+        text = "---\nname: x\n---\n\nRepo local del laboratorio.\n- 2026-09-24: Binance permisos de Codex revisados.\n  detalle\n- TimesFM necesita memoria.\n"
+        chunks = split_memory(text)
+        self.assertEqual(len(chunks), 3)
+        self.assertIn("detalle", chunks[1][1])
+        self.assertEqual(autolinks(chunks[1][1]), ["Binance Spot", "Codex"])
+        with tempfile.TemporaryDirectory() as mem:
+            (Path(mem) / "MEMORY.md").write_text("- índice", encoding="utf-8")
+            (Path(mem) / "infra.md").write_text(text, encoding="utf-8")
+            notes = mind_notes(mem, "# AGENTS\n## Roles\nClaude y Codex.\n## Sentimiento\nFear & Greed\n", ["2026-09-30"], ["2026-09-30"])
+        self.assertEqual(sum(k.startswith("Claude/Memoria/") for k in notes), 3, "MEMORY.md (el índice) no se copia")
+        self.assertIn("[[Sentimiento]]", notes["Protocolo/Sentimiento.md"][1])
+        self.assertIn("[[Roles]]", notes["Protocolo/Protocolo de los agentes.md"][1])
+        self.assertIn("[[2026-09-30]]", notes["Codex/Mente de Codex.md"][1])
+
+
 class WriteTest(unittest.TestCase):
     def test_user_text_outside_the_block_survives(self):
         first = merge(None, "agente", "v1")

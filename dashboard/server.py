@@ -29,8 +29,11 @@ CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' 
 log = logging.getLogger("dashboard")
 
 
+MAX_POST_BYTES = 2000
+
+
 def make_handler(state_provider, candles_provider, allowed_hosts, liquidity_provider=None, radar_provider=None,
-                 workspace_provider=None):
+                 workspace_provider=None, predictions=None):
     class Handler(BaseHTTPRequestHandler):
         server_version = "ai-trading-lab"
         sys_version = ""
@@ -67,6 +70,8 @@ def make_handler(state_provider, candles_provider, allowed_hosts, liquidity_prov
                     return self._json(200, radar_provider())
                 if url.path == "/api/workspace" and workspace_provider:
                     return self._json(200, workspace_provider())
+                if url.path == "/api/predicciones" and predictions:
+                    return self._json(200, predictions.load_all())
                 if url.path == "/api/candles":
                     params = parse_qs(url.query)
                     symbol = params.get("symbol", [""])[0]
@@ -89,7 +94,28 @@ def make_handler(state_provider, candles_provider, allowed_hosts, liquidity_prov
         def _refuse(self):
             self._json(405, {"error": "solo lectura"})
 
-        do_POST = do_PUT = do_DELETE = do_PATCH = _refuse
+        # Única escritura del panel: una pregunta de predicción a un archivo local (nunca al diario ni a Binance).
+        # La cabecera propia obliga al navegador a pedir permiso CORS, que este servidor nunca concede, así que una
+        # web ajena no puede enviarla; además se exige el Host y, si viene, el Origin de este mismo panel.
+        def do_POST(self):
+            if urlsplit(self.path).path != "/api/predicciones" or not predictions:
+                return self._refuse()
+            origin = self.headers.get("Origin")
+            if (self.headers.get("Host", "") not in allowed_hosts
+                    or (origin and origin.removeprefix("http://") not in allowed_hosts)
+                    or self.headers.get("X-TV-Request") != "1"
+                    or not self.headers.get("Content-Type", "").startswith("application/json")):
+                return self._json(403, {"error": "petición no permitida"})
+            length = int(self.headers.get("Content-Length") or 0)
+            if not 0 < length <= MAX_POST_BYTES:
+                return self._json(413, {"error": "pregunta demasiado larga"})
+            try:
+                question = json.loads(self.rfile.read(length)).get("question", "")
+                return self._json(201, predictions.add_request(question, source="tv"))
+            except (ValueError, AttributeError) as error:
+                return self._json(400, {"error": str(error) or "pregunta inválida"})
+
+        do_PUT = do_DELETE = do_PATCH = _refuse
 
     return Handler
 
@@ -107,10 +133,10 @@ class LocalServer(ThreadingHTTPServer):
 
 
 def make_server(port, state_provider, candles_provider, liquidity_provider=None, radar_provider=None,
-                workspace_provider=None):
+                workspace_provider=None, predictions=None):
     server = LocalServer(("127.0.0.1", port), None)
     real_port = server.server_address[1]
     allowed = {f"127.0.0.1:{real_port}", f"localhost:{real_port}"}
     server.RequestHandlerClass = make_handler(state_provider, candles_provider, allowed, liquidity_provider,
-                                              radar_provider, workspace_provider)
+                                              radar_provider, workspace_provider, predictions)
     return server

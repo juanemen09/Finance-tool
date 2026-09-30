@@ -203,6 +203,26 @@ table.t td.num, table.t th.num { text-align: right; }
 .ticker-track span { margin-right: 3em; }
 .ticker-track em { color: var(--ice); font-style: normal; margin-right: 0.5em; }
 
+/* ------------------------------------------------------------ predicciones libres */
+.grid-pred { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.6fr); gap: 1.1vw; height: 100%; min-height: 0; }
+.grid-pred > .tile { overflow: auto; min-height: 0; }
+.pred-form { display: flex; gap: 0.5vw; margin-bottom: 0.6vh; }
+.pred-input {
+  flex: 1; min-width: 0; font: inherit; color: var(--ink); padding: 0.8vh 0.8vw; border-radius: 0.6vw;
+  background: rgba(3, 8, 24, 0.7); border: 1px solid var(--line); outline: none;
+}
+.pred-input:focus { border-color: var(--ice); box-shadow: 0 0 0.8vw rgba(111, 211, 255, 0.35); }
+.pred-send {
+  font: inherit; font-weight: 650; color: #fff; cursor: pointer; padding: 0 1vw; border-radius: 0.6vw; border: 0;
+  background: linear-gradient(90deg, var(--crimson), #3c5adc);
+}
+.pred-headline { font-size: 1.1em; font-weight: 600; margin: 0.4vh 0 0.8vh; }
+.pred-chart { height: 26vh; min-height: 180px; margin: 0.6vh 0; }
+.pred-answer .tabs button { font-size: 0.78em; }
+.pred-summary { margin: 0.8vh 0; padding-left: 1.1em; display: grid; gap: 0.5vh; }
+.pred-answer details { margin-top: 0.6vh; color: var(--muted); }
+@media (max-width: 900px) { .grid-pred { grid-template-columns: 1fr; } }
+
 /* ------------------------------------------------------------ mapa 3D (grafo) */
 .hud { grid-template-columns: auto auto auto 1fr auto auto; }
 .graph-toggle {

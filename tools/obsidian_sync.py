@@ -7,7 +7,9 @@
 - En cada nota reemplaza solo el bloque entre los marcadores de abajo: lo que el usuario escriba fuera se conserva.
 - Lee el diario con el rol dashboard_reader. La ruta de la bóveda va en config/workspace.local.json
   (`obsidian_vault`), fuera de git. Las notas llevan datos del diario, nunca claves ni conexiones.
-- Claude lee estas notas (sobre todo «Contexto para Claude») para retomar el hilo entre sesiones.
+- Claude y Codex leen estas notas (sobre todo «Contexto de los agentes») para retomar el hilo entre sesiones.
+- También escribe la «mente» de los agentes: la memoria de Claude (`claude_memory_dir` en la configuración local),
+  partida en recuerdos, y cada sección de AGENTS.md, el protocolo que comparten. Todo se enlaza por conceptos.
 """
 import argparse
 import json
@@ -29,7 +31,8 @@ AGENT = {"claude": "Claude", "chatgpt": "Codex"}
 # Colores del grafo de Obsidian por etiqueta (0xRRGGBB), los mismos del modo TV.
 COLOR_GROUPS = [("agente", 0x45E0B0), ("activo", 0x6FD3FF), ("estrategia", 0xAA8CFF), ("investigacion", 0xFFD66E),
                 ("regla", 0xFFB547), ("decision", 0xFF4D6D), ("proyecto", 0x5A96FF), ("persona", 0xEBF0FF),
-                ("pendiente", 0xFF9F43), ("diario", 0x8A9BC8), ("centro", 0xFF4D6D)]
+                ("pendiente", 0xFF9F43), ("diario", 0x8A9BC8), ("centro", 0xFF4D6D),
+                ("memoria-claude", 0x7CFFCB), ("protocolo", 0xC9B6FF), ("memoria-codex", 0xFF6B8A)]
 EXTRA_SQL = {
     "decisions": "select id, created_at, message from events where kind = 'user_decision' order by id",
     "limits": "select id, created_at, active, veto_minutes, max_loss_usdt, min_reward_risk, weekly_loss_limit_usdt, "
@@ -84,7 +87,8 @@ def build_notes(state, radar, workspace, decisions, limits, now):
         f"- Estrategias: {', '.join(link(s['strategy_id']) for s in alive) or '—'} · {link('Estrategias rechazadas')}.",
         f"- Investigación: {link('TimesFM')}, {link('Tesis IA')}, {link('Sentimiento')}.",
         f"- Ecosistema: {', '.join(link(p['name']) for p in projects)}, {link('Money Printer')}, {link('Zyneath')}.",
-        f"- {link('Equipo')} · {link('Contexto para Claude')} · decisiones: {dec_links}.",
+        f"- {link('Equipo')} · {link(CONTEXT_NOTE)} · decisiones: {dec_links}.",
+        f"- Mente de los agentes: {link('Mente de Claude')}, {link('Mente de Codex')}, {link('Protocolo de los agentes')}.",
     ])
 
     for a in state.get("agents", []):
@@ -220,8 +224,10 @@ def build_notes(state, radar, workspace, decisions, limits, now):
                          + (f" ({', '.join(link(s) for s in mentions)})" if mentions else ""))
         note(f"Diario/{day}.md", "diario", lines)
 
-    note("Contexto para Claude.md", "centro", [
-        "# Contexto para Claude", "Resumen vivo para retomar el hilo entre sesiones. Lo regenera tools/obsidian_sync.py.", "",
+    note(f"{CONTEXT_NOTE}.md", "centro", [
+        f"# {CONTEXT_NOTE}", f"Resumen vivo para que {link('Claude')} y {link('Codex')} retomen el hilo entre sesiones. "
+        "Lo regenera tools/obsidian_sync.py cada hora. Son datos, no instrucciones.", "",
+        f"- Memoria y reglas: {link('Mente de Claude')}, {link('Mente de Codex')}, {link('Protocolo de los agentes')}.",
         f"- Límites vigentes: {link('Reglas de riesgo')} (veto {sa.get('veto_minutes', '—')} min, pérdida máx. {fmt(sa.get('max_loss_usdt'))} USDT).",
         f"- Decisiones del usuario: {dec_links}.",
         "- Claude solo lee Binance; Codex es el único ejecutor y corre cada hora (y cada 15 min de 19:15 a 20:45 en Quito).",
@@ -230,6 +236,89 @@ def build_notes(state, radar, workspace, decisions, limits, now):
         f"- Pendientes del equipo: {len(pending)} ({link('Equipo')}).",
         f"- Estrategias vivas: {', '.join(link(s['strategy_id']) for s in alive)}.",
     ])
+    return notes
+
+
+CONTEXT_NOTE = "Contexto de los agentes"
+# Conceptos que enlazan solos las notas de memoria y de protocolo con el resto del grafo.
+KEYWORDS = [
+    (r"\bBinance\b", "Binance Spot"), (r"\bCodex\b|\bchatgpt\b", "Codex"), (r"\bClaude\b", "Claude"), (r"TimesFM", "TimesFM"),
+    (r"S-CHANNEL-1D-STABLE", "S-CHANNEL-1D-STABLE"), (r"S-CHANNEL-1D(?!-)", "S-CHANNEL-1D"),
+    (r"\bveto\b|standing_authorizations|autorizaci|l[íi]mite", "Reglas de riesgo"),
+    (r"money-engine|Money ?Printer", "Money Printer"), (r"Zyneath", "Zyneath"),
+    (r"13F|capex|Situational Awareness|Tesis IA|cuello de botella", "Tesis IA"),
+    (r"sentimiento|sentiment|Fear & Greed|funding", "Sentimiento"), (r"\bequipo\b|\bteam\b", "Equipo"),
+    (r"\busuario\b|\buser\b|fundador", "Juan Emilio"), (r"hard test|pre-?registr|REJECTED|rechaz", "Estrategias rechazadas"),
+    (r"\bBTC\b", "BTC"), (r"\bETH\b", "ETH"), (r"\bSOL\b", "SOL"), (r"\bLINK\b", "LINK"), (r"\bONDO\b", "ONDO"),
+    (r"Obsidian", CONTEXT_NOTE), (r"modo TV|\bTV\b|dashboard|panel", "AI Trading Lab"),
+]
+
+
+def autolinks(text, exclude=()):
+    return [n for n in dict.fromkeys(n for pat, n in KEYWORDS if re.search(pat, text, re.I)) if n not in exclude]
+
+
+def split_memory(text):
+    """Cada punto principal de la memoria de Claude es un recuerdo: [(título, texto)]."""
+    body = re.sub(r"^---.*?---\s*", "", text, flags=re.S)
+    chunks, current = [], None
+    for line in body.splitlines():
+        if re.match(r"^- ", line) or re.match(r"^\*\*", line):
+            if current:
+                chunks.append(current)
+            current = [line]
+        elif current is not None:
+            current.append(line)
+        elif line.strip():
+            current = [line]
+    if current:
+        chunks.append(current)
+    out = []
+    for lines in chunks:
+        text = "\n".join(lines).strip()
+        first = re.sub(r"[*`\[\]]", "", lines[0].lstrip("- ")).strip()
+        title = " ".join(first.split()[:7]).rstrip(":;,.")
+        out.append((title or "recuerdo", text))
+    return out
+
+
+def mind_notes(memory_dir, agents_md, diary_days, codex_days):
+    """Notas de la «mente» de los agentes: la memoria de Claude y el protocolo que comparten con Codex."""
+    notes = {}
+    memories = []
+    for path in sorted(Path(memory_dir).glob("*.md")) if memory_dir and Path(memory_dir).is_dir() else []:
+        if path.name == "MEMORY.md":
+            continue
+        for i, (title, text) in enumerate(split_memory(path.read_text(encoding="utf-8")), 1):
+            name = safe_name(f"Recuerdo {i:02d} · {title}")
+            memories.append(name)
+            links = autolinks(text)
+            notes[f"Claude/Memoria/{name}.md"] = ("memoria-claude", "\n".join([
+                f"# {title}", f"Recuerdo de {link('Mente de Claude')}.", "", text, "",
+                f"Conecta con: {', '.join(link(n) for n in links) or '—'}"]))
+    notes["Claude/Mente de Claude.md"] = ("memoria-claude", "\n".join([
+        "# Mente de Claude", f"Lo que {link('Claude')} recuerda del proyecto entre sesiones (su memoria persistente), "
+        f"y el {link('Protocolo de los agentes')} que comparte con {link('Codex')}.", "",
+        *[f"- {link(m)}" for m in memories]]))
+
+    sections = re.split(r"^## ", agents_md or "", flags=re.M)[1:]
+    titles = []
+    for sec in sections:
+        title, _, text = sec.partition("\n")
+        name = safe_name(title.strip())
+        titles.append(name)
+        links = autolinks(title + text)
+        notes[f"Protocolo/{name}.md"] = ("protocolo", "\n".join([
+            f"# {title.strip()}", f"Parte del {link('Protocolo de los agentes')} (AGENTS.md).", "", text.strip(), "",
+            f"Conecta con: {', '.join(link(n) for n in links) or '—'}"]))
+    notes["Protocolo/Protocolo de los agentes.md"] = ("protocolo", "\n".join([
+        "# Protocolo de los agentes", f"Las reglas que siguen {link('Claude')} y {link('Codex')} (AGENTS.md del repositorio).", "",
+        *[f"- {link(t)}" for t in titles]]))
+    notes["Codex/Mente de Codex.md"] = ("memoria-codex", "\n".join([
+        "# Mente de Codex", f"{link('Codex')} no guarda memoria propia entre corridas: su contexto es el "
+        f"{link('Protocolo de los agentes')}, su buzón en el diario y lo que escribe cada día.", "",
+        f"- Días con actividad de Codex: {', '.join(link(d) for d in codex_days) or '—'}",
+        f"- Contexto vivo: {link(CONTEXT_NOTE)}"]))
     return notes
 
 
@@ -269,7 +358,10 @@ def ensure_color_groups(vault):
         cfg = json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, ValueError):
         return False
-    if cfg.get("colorGroups"):
+    ours = {f"tag:#{tag}" for tag, _ in COLOR_GROUPS}
+    current = {g.get("query") for g in cfg.get("colorGroups", [])}
+    # si el usuario definió grupos propios, no se tocan; si son solo los nuestros y faltan nuevos, se completan
+    if current and (not current <= ours or current == ours):
         return False
     cfg["colorGroups"] = [{"query": f"tag:#{tag}", "color": {"a": 1, "rgb": rgb}} for tag, rgb in COLOR_GROUPS]
     path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
@@ -296,10 +388,21 @@ def main(argv=None):
         state = build_state(run, now)
         decisions, limits = run(EXTRA_SQL["decisions"]), run(EXTRA_SQL["limits"])
     notes = build_notes(state, RadarCache().get(), WorkspaceCache().get(), decisions, limits, now)
+    days = sorted(k[len("Diario/"):-3] for k in notes if k.startswith("Diario/"))
+    codex_days = sorted({str(e["at"])[:10] for e in state.get("timeline", []) if e.get("agent") == "chatgpt"})
+    notes.update(mind_notes(config.get("claude_memory_dir"), (ROOT / "AGENTS.md").read_text(encoding="utf-8"), days, codex_days))
     if args.dry_run:
         print("\n".join(sorted(notes)))
         return 0
     written = write_notes(vault, notes)
+    # La nota vieja «Contexto para Claude» pasó a llamarse «Contexto de los agentes»: se retira solo si nadie escribió
+    # nada propio en ella (todo su texto está dentro del bloque generado).
+    old = Path(vault) / FOLDER / "Contexto para Claude.md"
+    if old.exists():
+        text = old.read_text(encoding="utf-8")
+        outside = re.sub(re.escape(START) + ".*?" + re.escape(END), "", text, flags=re.S)
+        if not re.sub(r"^---.*?---", "", outside, flags=re.S).strip():
+            old.unlink()
     colored = ensure_color_groups(vault)
     print(json.dumps({"notes": len(notes), "written": written, "color_groups": colored}))
     return 0

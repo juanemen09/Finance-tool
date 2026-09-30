@@ -347,9 +347,95 @@
     };
   }
 
+  // ---------------------------------------------------------------- predicciones libres (fuera del trading)
+  let predictions = null, predSeries = 0, predChart = null, predLines = [], predKey = "";
+  const predBox = document.createElement("div");
+  predBox.className = "tv-chart pred-chart";
+
+  async function askPrediction(input, status) {
+    const question = input.value.trim();
+    if (question.length < 8) { status.textContent = "Escribe una pregunta un poco más larga."; return; }
+    status.textContent = "Enviando…";
+    try {
+      const r = await fetch("/api/predicciones", { method: "POST", headers: { "Content-Type": "application/json", "X-TV-Request": "1" },
+        body: JSON.stringify({ question }) });
+      const body = await r.json();
+      if (!r.ok) throw new Error(body.error || r.status);
+      input.value = "";
+      status.textContent = "Recibida. Claude la responde con datos públicos y TimesFM; pídeselo en el chat («atiende las predicciones»).";
+      await refreshPredictions();
+    } catch (e) { status.textContent = `No se pudo enviar: ${e.message}`; }
+  }
+
+  function drawPredChart(serie) {
+    const key = `${serie.name}|${serie.history.length}|${(serie.forecast || []).length}`;
+    if (!predChart) {
+      predChart = window.LightweightCharts.createChart(predBox, {
+        layout: { background: { type: "solid", color: "transparent" }, textColor: "#9fb0dc", fontSize: 14 },
+        grid: { vertLines: { color: "rgba(130,160,255,0.06)" }, horzLines: { color: "rgba(130,160,255,0.06)" } },
+        rightPriceScale: { borderColor: "rgba(130,160,255,0.16)" }, timeScale: { borderColor: "rgba(130,160,255,0.16)" },
+        handleScroll: false, handleScale: false, autoSize: true,
+      });
+    }
+    if (key === predKey) return;
+    predKey = key;
+    for (const s of predLines) predChart.removeSeries(s);
+    predLines = [];
+    const line = (data, opts) => { const s = predChart.addLineSeries({ priceLineVisible: false, lastValueVisible: false, ...opts }); s.setData(data); predLines.push(s); return s; };
+    const hist = line(serie.history.map((p) => ({ time: p.time, value: p.value })), { color: "#6fd3ff", lineWidth: 2 });
+    const f = serie.forecast || [];
+    if (f.length) {
+      const joint = serie.history[serie.history.length - 1];
+      line([{ time: joint.time, value: joint.value }, ...f.map((p) => ({ time: p.time, value: p.p90 }))], { color: "rgba(255,77,109,0.45)", lineWidth: 1, lineStyle: 2 });
+      line([{ time: joint.time, value: joint.value }, ...f.map((p) => ({ time: p.time, value: p.p10 }))], { color: "rgba(255,77,109,0.45)", lineWidth: 1, lineStyle: 2 });
+      line([{ time: joint.time, value: joint.value }, ...f.map((p) => ({ time: p.time, value: p.p50 }))], { color: "#ff4d6d", lineWidth: 3 });
+    }
+    if (serie.climatology) line(serie.climatology.map((p) => ({ time: p.time, value: p.value })), { color: "#ffb547", lineWidth: 2, lineStyle: 1 });
+    for (const t of serie.thresholds || []) hist.createPriceLine({ price: t.value, color: "rgba(255,181,71,0.6)", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: t.label });
+    predChart.timeScale().fitContent();
+  }
+
+  function secPredictions() {
+    const reqs = predictions?.requests || [];
+    const res = (predictions?.results || [])[0];
+    const input = h("input", { class: "pred-input", type: "text", maxlength: "500", placeholder: "Pregunta cualquier cosa que se pueda medir: clima, precios, demanda…" });
+    const status = h("div", { class: "sub" });
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") askPrediction(input, status); });
+    const serie = res?.series?.[Math.min(predSeries, (res?.series?.length || 1) - 1)];
+    if (serie) requestAnimationFrame(() => drawPredChart(serie));
+    return {
+      title: "Predicciones", sub: "preguntas libres fuera del trading · datos públicos + TimesFM 3.0",
+      body: h("div", { class: "grid-pred" },
+        h("div", { class: "tile" },
+          h("h3", { text: "Preguntar" }),
+          h("div", { class: "pred-form" }, input, h("button", { type: "button", class: "pred-send", onclick: () => askPrediction(input, status), text: "Enviar" })),
+          status,
+          h("h3", { text: "Preguntas" }),
+          reqs.length ? h("ul", { class: "list" }, reqs.slice(0, 8).map((r) => h("li", {},
+            badge(r.status, r.status === "respondida" ? "ok" : "mid"), h("span", { class: "clamp", text: r.question }), h("span", { class: "sub", text: ago(r.created_at) }))))
+            : empty("Todavía no hay preguntas.")),
+        res ? h("div", { class: "tile pred-answer" },
+          h("h3", { text: res.question }),
+          h("p", { class: "pred-headline", text: res.headline || "" }),
+          h("div", { class: "tabs" }, res.series.map((s, i) => h("button", { type: "button", "aria-selected": String(s === serie),
+            onclick: () => { predSeries = i; predKey = ""; paintFace(true); }, text: `${s.name} (${s.unit})` }))),
+          predBox,
+          h("div", { class: "sub", text: "Celeste: historial · rojo: mediana de TimesFM con banda p10–p90 · ámbar: lo normal de ese mes." }),
+          h("ul", { class: "pred-summary" }, (res.summary || []).map((line) => h("li", { text: line }))),
+          h("details", {}, h("summary", { text: "Límites y fuentes" }),
+            h("ul", {}, (res.caveats || []).map((c) => h("li", { text: c }))),
+            h("div", {}, (res.sources || []).map((s) => h("span", { class: "chip", text: s.name })))))
+          : h("div", { class: "tile" }, empty("Aún no hay respuestas."))),
+    };
+  }
+
+  async function refreshPredictions() {
+    try { predictions = await getJSON("/api/predicciones"); if (state && SECTIONS[current][0] === "Predicciones") paintFace(true); } catch (e) { console.error("predicciones", e); }
+  }
+
   const SECTIONS = [
     ["Mercado", secMarket], ["Agentes", secAgents], ["Estrategias", secStrategies], ["TimesFM", secForecast],
-    ["Tesis IA", secThesis], ["Sentimiento", secSentiment], ["Money Printer", secMoney], ["Zyneath", secZyneath], ["Equipo", secTeam],
+    ["Predicciones", secPredictions], ["Tesis IA", secThesis], ["Sentimiento", secSentiment], ["Money Printer", secMoney], ["Zyneath", secZyneath], ["Equipo", secTeam],
   ];
 
   // ---------------------------------------------------------------- navegación con transición 3D
@@ -364,6 +450,10 @@
 
   function paintFace(calm) {
     if (!state) return;
+    if (calm && SECTIONS[current][0] === "Predicciones") { // no borrar una pregunta a medio escribir
+      const typing = document.querySelector(".pred-input");
+      if (typing && (typing === document.activeElement || typing.value)) return;
+    }
     const face = $("face");
     let s;
     try { s = SECTIONS[current][1](); } catch (e) { console.error(SECTIONS[current][0], e); s = { title: SECTIONS[current][0], sub: "", body: empty("Sin datos para esta sección.") }; }
@@ -552,7 +642,7 @@
     try { radar = await getJSON("/api/radar"); if (state) { renderTop(); pushScene(); if (current === 0) paintFace(true); } } catch (e) { console.error("radar", e); }
   }
   async function refreshWorkspace() {
-    try { workspace = await getJSON("/api/workspace"); if (state && current >= 6) paintFace(true); } catch (e) { console.error("workspace", e); }
+    try { workspace = await getJSON("/api/workspace"); if (state && ["Money Printer", "Zyneath", "Equipo"].includes(SECTIONS[current][0])) paintFace(true); } catch (e) { console.error("workspace", e); }
   }
 
   // ---------------------------------------------------------------- mapa 3D: el ecosistema como grafo de conocimiento
@@ -770,12 +860,14 @@
 
   // ---------------------------------------------------------------- interacción
   document.addEventListener("keydown", (e) => {
+    // escribiendo una pregunta: las teclas son texto, no atajos; y la rotación se detiene mientras tanto
+    if (e.target.closest && e.target.closest("input, textarea")) { pausedUntil = Date.now() + MANUAL_PAUSE_SECONDS * 1000; return; }
     if (e.key === "g" || e.key === "G") return setGraphMode(!graphOn);
     if (e.key === "Escape" && graphOn) return setGraphMode(false);
     if (graphOn) return;
     if (e.key === "ArrowRight") go(current + 1, true);
     else if (e.key === "ArrowLeft") go(current - 1, true);
-    else if (/^[1-9]$/.test(e.key)) go(Number(e.key) - 1, true);
+    else if (/^[0-9]$/.test(e.key)) go(e.key === "0" ? 9 : Number(e.key) - 1, true);
     else if (e.key === " ") { pausedUntil = Date.now() < pausedUntil ? 0 : Date.now() + 10 * 60_000; renderTabs(); }
   });
   let touchX = null;
@@ -810,7 +902,8 @@
   document.body.classList.add("idle");
   tick();
   setInterval(tick, 1000);
-  Promise.all([refreshRadar(), refreshWorkspace()]).then(refreshState);
+  Promise.all([refreshRadar(), refreshWorkspace(), refreshPredictions()]).then(refreshState);
+  setInterval(refreshPredictions, 60_000);
   setInterval(refreshState, 20_000);
   setInterval(refreshRadar, 30_000);
   setInterval(refreshWorkspace, 120_000);

@@ -164,7 +164,21 @@ class LiquidityTest(unittest.TestCase):
 class ServerTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.server = make_server(0, state_provider=lambda: {"ok": True},
+        cls.stored = []
+
+        class FakePredictions:
+            @staticmethod
+            def load_all():
+                return {"requests": [], "results": []}
+
+            @staticmethod
+            def add_request(question, source):
+                if len(question) < 8:
+                    raise ValueError("La pregunta es demasiado corta.")
+                cls.stored.append((question, source))
+                return {"id": "x", "question": question}
+
+        cls.server = make_server(0, state_provider=lambda: {"ok": True}, predictions=FakePredictions,
                                  candles_provider=lambda s, i: {"symbol": s, "interval": i, "candles": []},
                                  liquidity_provider=lambda: {"supply": [], "growth_30d": []},
                                  radar_provider=lambda: {"rows": []})
@@ -235,6 +249,25 @@ class ServerTest(unittest.TestCase):
     def test_candles_validation(self):
         self.assertEqual(self.get("/api/candles?symbol=BTCUSDT&interval=1d")[0], 200)
         self.assertEqual(self.get("/api/candles?symbol=DOGEUSDT&interval=1d")[0], 400)
+
+    def post(self, body, headers):
+        request = urllib.request.Request(f"http://127.0.0.1:{self.port}/api/predicciones", data=body, method="POST", headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=5) as r:
+                return r.status, json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            return e.code, json.loads(e.read())
+
+    def test_prediction_post_needs_the_panel_header(self):
+        ok = {"Content-Type": "application/json", "X-TV-Request": "1"}
+        body = json.dumps({"question": "¿Lloverá más en Quito en noviembre?"}).encode()
+        self.assertEqual(self.post(body, {"Content-Type": "application/json"})[0], 403, "sin la cabecera propia")
+        self.assertEqual(self.post(body, {**ok, "Origin": "https://evil.example.com"})[0], 403, "otro origen")
+        self.assertEqual(self.post(b"x" * 3000, ok)[0], 413)
+        status, item = self.post(body, ok)
+        self.assertEqual(status, 201)
+        self.assertEqual(self.stored[-1], ("¿Lloverá más en Quito en noviembre?", "tv"))
+        self.assertEqual(self.post(json.dumps({"question": "hola"}).encode(), ok)[0], 400)
 
     def test_write_methods_are_refused(self):
         request = urllib.request.Request(f"http://127.0.0.1:{self.port}/api/state", data=b"x", method="POST")
