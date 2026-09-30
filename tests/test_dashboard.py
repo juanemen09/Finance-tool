@@ -69,38 +69,28 @@ class ShapingTest(unittest.TestCase):
         self.assertEqual(health["claude"]["state"], "atrasado")
         self.assertIn("80 min", health["claude"]["reason"])
 
-    def test_codex_writing_once_a_day_is_not_late(self):
-        # Codex escribe a las 00:20 UTC y no vuelve a escribir: seis horas después sigue al día.
-        health = self.health_at(NOW, datetime(2026, 9, 24, 6, 2, tzinfo=timezone.utc),
-                                datetime(2026, 9, 24, 0, 20, tzinfo=timezone.utc))
-        self.assertEqual((health["claude"]["state"], health["chatgpt"]["state"]), ("ok", "ok"))
-        self.assertEqual(health["chatgpt"]["minutes_since"], 370)
-
-    def test_codex_missing_its_daily_cycle_is_late(self):
-        health = self.health_at(NOW, datetime(2026, 9, 24, 6, 2, tzinfo=timezone.utc),
-                                datetime(2026, 9, 23, 20, 15, tzinfo=timezone.utc))
-        self.assertEqual(health["chatgpt"]["state"], "atrasado")
-        self.assertIn("2026-09-24T00Z", health["chatgpt"]["reason"])
-
-    def test_codex_window_still_open_before_0200_utc(self):
-        # A las 01:30 UTC la ventana de hoy sigue abierta: basta con el análisis del día anterior.
-        now = datetime(2026, 9, 24, 1, 30, tzinfo=timezone.utc)
-        health = self.health_at(now, datetime(2026, 9, 24, 1, 6, tzinfo=timezone.utc),
-                                datetime(2026, 9, 23, 0, 20, tzinfo=timezone.utc))
-        self.assertEqual(health["chatgpt"]["state"], "ok")
+    def test_codex_hourly_gets_ninety_minutes(self):
+        # Codex corre en el minuto :15: 80 min sin escribir todavía es su ritmo; 100 min ya no.
+        on_time = self.health_at(NOW, datetime(2026, 9, 24, 6, 2, tzinfo=timezone.utc),
+                                 datetime(2026, 9, 24, 5, 10, tzinfo=timezone.utc))
+        self.assertEqual((on_time["claude"]["state"], on_time["chatgpt"]["state"]), ("ok", "ok"))
+        late = self.health_at(NOW, datetime(2026, 9, 24, 6, 2, tzinfo=timezone.utc),
+                              datetime(2026, 9, 24, 4, 50, tzinfo=timezone.utc))
+        self.assertEqual(late["chatgpt"]["state"], "atrasado")
+        self.assertIn("100 min", late["chatgpt"]["reason"])
 
     def test_unattended_mailbox_makes_codex_late(self):
-        pending = [{"to_agent_id": "chatgpt", "n": 2, "oldest": datetime(2026, 9, 24, 1, 0, tzinfo=timezone.utc)}]
+        pending = [{"to_agent_id": "chatgpt", "n": 2, "oldest": datetime(2026, 9, 24, 4, 30, tzinfo=timezone.utc)}]
         health = self.health_at(NOW, datetime(2026, 9, 24, 6, 2, tzinfo=timezone.utc),
-                                datetime(2026, 9, 24, 0, 20, tzinfo=timezone.utc), pending)
+                                datetime(2026, 9, 24, 6, 15, tzinfo=timezone.utc), pending)
         self.assertEqual(health["chatgpt"]["state"], "atrasado")
         self.assertIn("2 mensaje(s)", health["chatgpt"]["reason"])
         self.assertEqual(health["chatgpt"]["pending_messages"], 2)
 
     def test_recent_mailbox_is_fine(self):
-        pending = [{"to_agent_id": "chatgpt", "n": 1, "oldest": datetime(2026, 9, 24, 5, 0, tzinfo=timezone.utc)}]
+        pending = [{"to_agent_id": "chatgpt", "n": 1, "oldest": datetime(2026, 9, 24, 6, 0, tzinfo=timezone.utc)}]
         health = self.health_at(NOW, datetime(2026, 9, 24, 6, 2, tzinfo=timezone.utc),
-                                datetime(2026, 9, 24, 0, 20, tzinfo=timezone.utc), pending)
+                                datetime(2026, 9, 24, 6, 15, tzinfo=timezone.utc), pending)
         self.assertEqual(health["chatgpt"]["state"], "ok")
 
     def test_agent_without_rows_is_silent(self):

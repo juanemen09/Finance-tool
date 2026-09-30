@@ -50,7 +50,7 @@ no es `auto_ok`, el correo dice qué límite incumple y que solo se ejecutará c
     propuesta. El texto: «El usuario autorizó <proposal_id> por correo a las <hora UTC>. Estado ahora: <status>. Si es
     READY_TO_EXECUTE, ejecútala tras comprobar precio, saldo y zona de entrada.»
   - Responde en el hilo con lo que quedó registrado, el estado y cuándo corre Codex: cada 15 min de 19:15 a 20:45 en
-    Quito, y cada 4 h el resto del día.
+    Quito, y cada hora (minuto :15) el resto del día.
 - **VETO.** Inserta en `user_vetoes` (`proposal_id`, la cita y `recorded_by_agent_id 'claude'`) y léelo de vuelta.
   Envía a chatgpt un `ALERT` que diga «Vetada por el usuario por correo: no la ejecutes», y confirma en el hilo.
   - Si ya se ejecutó, dilo en la respuesta: el veto no deshace una compra.

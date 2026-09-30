@@ -54,14 +54,16 @@ select * from v_proposal_status where status not in ('EXECUTED', 'EXPIRED') orde
 - Para pedir algo al otro agente: `insert into agent_messages (from_agent_id, to_agent_id, kind, related_ref, body, expires_at)`.
   `kind`: `REVIEW_REQUEST`, `REVIEW_DONE`, `EXECUTION_DONE`, `ALERT`, `INFO`.
 - Al atenderlo: `insert into message_acks (message_id, acked_by_agent_id, outcome)`. Solo el destinatario puede hacerlo.
-- Frecuencia: Claude revisa cada hora (minuto :06, tras el cierre de 1h). ChatGPT/Codex (desde el 2026-09-27,
-  tras agotar su límite de uso): cada 15 minutos de 00:15 a 01:45 UTC (19:15-20:45 en Quito), la ventana tras el
-  cierre diario donde nacen propuestas, revisiones, vetos, ejecuciones y salidas de las estrategias diarias, y el
-  resto del día cada 4 horas (04:15, 08:15, 12:15, 16:15 y 20:15 UTC) solo para el buzón y las posiciones.
-  Codex escribe su análisis a ciegas una vez al día (ciclo 00Z), no cada hora. Si no hay nada pendiente, termina
-  sin analizar. Los stops están puestos en Binance, así que una posición no queda desprotegida entre ejecuciones.
+- Frecuencia (desde el 2026-09-30, pedido del usuario: comunicación y análisis continuos, al menos cada hora):
+  - **Claude**, cada hora en el minuto :06, tras el cierre de 1h.
+  - **Codex**, cada hora en el minuto :15, todo el día, y además cada 15 minutos de 00:15 a 01:45 UTC (19:15-20:45 en
+    Quito). Esa es la ventana tras el cierre diario, donde nacen las propuestas, las revisiones, las ejecuciones y las
+    salidas de las estrategias diarias.
+  - En cada corrida horaria Codex atiende el buzón y las posiciones, ejecuta lo que esté `READY_TO_EXECUTE` y escribe
+    su análisis a ciegas del ciclo (uno corto si nada cambió). Así su actividad en el diario sirve de señal de vida.
+  - Los stops están puestos en Binance: una posición nunca queda desprotegida entre corridas.
 - **Si el ejecutor no responde** (una propuesta `READY_TO_EXECUTE` o una salida por señal sin atender 30 minutos
-  después de la ventana, o Codex sin actividad en el diario durante más de 5 horas), Claude manda un correo
+  después de estar lista, o Codex sin actividad en el diario durante más de 2 horas), Claude manda un correo
   IMPORTANTE al usuario con la orden exacta para hacerla él mismo en la app de Binance (par, lado, cantidad,
   precio límite y stop). Claude no ejecuta: solo prepara la orden.
 
@@ -226,6 +228,17 @@ sin respuesta suya, ni por chat ni por correo, la propuesta se ejecuta sin esper
 comprando o vendiendo. Ningún agente debe pedirle confirmación adicional ni frenar una propuesta `auto_ok` porque sea de
 noche o porque él no contestó. Lo único que sigue bloqueado es lo que incumple alguno de sus límites (`auto_ok = false`):
 ejecutarlo violaría sus propios parámetros, así que solo sale con su «autorizo».
+
+**Límites ampliados para operaciones con más riesgo** (autorizado por el usuario el 2026-09-30, `standing_authorizations`
+fila 4):
+- **Qué cambió:** pérdida máxima por operación de 0,80 a 1,20 USDT, riesgo/beneficio mínimo de 1,5 a 1,2 y límite
+  de pérdida semanal de 1,0 a 2,5 USDT. El usuario autorizó a los agentes a operar lo que tenga más riesgo si se ve
+  como buena jugada, y este es el margen para hacerlo sin él.
+- **Qué sigue fijo:** solo Spot, universo de 5 pares, 7 USDT por posición, 1 posición y solo estrategias
+  `LIVE_ELIGIBLE`.
+- **Qué nunca se pasa por encima:** un veto explícito del usuario.
+- **Los agentes no cambian los límites por su cuenta en cada ciclo.** Si una buena jugada no cabe en esta fila, lo
+  proponen al usuario con los números y queda registrado en una fila nueva citando su mensaje.
 
 `v_executable_proposals.authorization_mode` dice si la autorización fue del usuario (`USER`) o permanente
 (`STANDING`). **Veto:** si el usuario escribe a cualquier agente "veto <proposal_id>", ese agente inserta en
