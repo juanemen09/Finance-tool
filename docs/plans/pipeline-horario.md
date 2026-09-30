@@ -8,15 +8,16 @@ original se adoptó tal cual, qué se adaptó y por qué, y qué queda pendiente
 | Minuto | Quién | Qué hace | Dónde queda |
 |---|---|---|---|
 | 00 | Binance | Cierra la vela de 1 h. | — |
-| 01 | Orquestador (`tools/orquestador.py`, Programador de tareas) | Indicadores de 1 h de los 5 pares; guardia de ejecución (spread y deslizamiento desde el libro de órdenes); Fear & Greed y tono de titulares; TimesFM a 1–4 h en un proceso efímero; contenedores opcionales; horas parecidas del pasado. | Nota `AI Trading Lab/Horas/AAAA-MM-DD_HHH00` (Local REST API; si Obsidian está cerrado, el archivo) |
+| 01 | Orquestador (`tools/orquestador.py`, Programador de tareas) | Indicadores de 1 h de los 5 pares; guardia de ejecución (spread y deslizamiento desde el libro de órdenes); Fear & Greed y tono de titulares; TimesFM a 1–4 h (servicio residente o proceso efímero); tono FinBERT de los titulares de 24 h; horas parecidas del pasado. | Nota `AI Trading Lab/Horas/AAAA-MM-DD_HHH00` (Local REST API; si Obsidian está cerrado, el archivo) |
 | 01 | Orquestador | Completa las 8 horas previas: tesis de Claude y de Codex y, a las 4 h, su resultado (`#tesis-exitosa`, `#tesis-fallida`, `#anomalia`). | Las mismas notas |
 | ≤ 04 | Orquestador | Tope de 170 s: termina siempre antes del ciclo de Claude. | `data/raw/horas/log.txt` |
 | 05–14 | Claude (tarea programada) | Lee la nota de la hora, analiza a ciegas, propone o revisa y avisa por correo si hay una decisión. No coloca órdenes. | Diario de Supabase (`analyses`, `trade_proposals`, `risk_reviews`) |
 | 15 | Codex (automatización de ChatGPT) | Único ejecutor. Buzón, posiciones y lo que esté `READY_TO_EXECUTE`: antes de enviar la orden recalcula la guardia en vivo y aborta si el spread > 0,2 % o el deslizamiento > 0,15 %. | Binance (MCP) y diario |
 | cada hora | Sincronizador (`tools/obsidian_sync.py`) | Mapa de conocimiento: agentes, activos, estrategias, reglas, decisiones, proyectos, memoria de Claude y protocolo. | `AI Trading Lab/…` |
 
-Hoy Claude corre en el minuto 02 más un margen al azar de hasta 4 minutos. Para que nunca lea una nota a medio
-escribir, su ciclo debe pasar al minuto 05 (ver §5).
+El ciclo de Claude corre en el minuto 05 (más un margen al azar), después de que la nota esté escrita.
+La TV muestra la nota en la sección «Hora» (`/api/hora`): mercado de 1 h, banda de TimesFM a 4 h, guardia, tono FinBERT,
+horas parecidas y el resultado de la última hora evaluada, más el estado del servicio de TimesFM.
 
 ## 2. Qué se adoptó, qué se adaptó y por qué
 
@@ -31,12 +32,12 @@ escribir, su ciclo debe pasar al minuto 05 (ver §5).
 | Templater dispara scripts de Windows | **Reemplazada** por el Programador de tareas | Templater solo corre con Obsidian abierto y ejecutar comandos del sistema desde una nota abre una puerta de seguridad. La plantilla `protocolo_operaciones` queda para abrir horas a mano con el mismo esquema. |
 | Contenedores efímeros «run-and-die» | **Adoptada** | `docker run --rm --memory N --network none`; el orquestador nunca descarga imágenes. TimesFM corre como proceso efímero con su propio Python: al cerrarse libera toda su RAM sin Docker. |
 | `gc.collect()` y `torch.cuda.empty_cache()` | **Adaptada** | El orquestador no carga modelos en su propio proceso: la memoria vuelve al sistema cuando el proceso hijo termina, que es más fuerte que vaciar cachés. Se llama a `gc.collect()` tras cada etapa. |
-| FinBERT para el tono de titulares | **Lista, desactivada** | Etapa `finbert` en `config/orquestador.json`; falta construir su imagen (descarga ≈ 440 MB del modelo). Hoy el tono sale de VADER. |
+| FinBERT para el tono de titulares | **Adoptada (2026-09-30), sin Docker** | Aprobada por el usuario. Proceso efímero con su propio Python (`%LOCALAPPDATA%i-trading-labinbert`, torch de CPU + transformers; aparte del de TimesFM porque transformers exige otra versión de `huggingface_hub`). Modelo ProsusAI/finbert en una revisión fijada, convertido a safetensors. Un contenedor haría crecer la máquina virtual de Docker, que no devuelve la RAM a Windows. Corre si hay ≥ 1,2 GB libres; VADER sigue en el diario. Contexto, no señal. |
 | Llama-3.2-Vision / Moondream2 sobre capturas de Binance | **Pospuesta** | Llama-3.2-Vision 11B necesita ≥ 8 GB y hay ≈ 2–3 GB libres. Además, los indicadores ya se calculan exactos desde las velas: un modelo de visión leyendo una captura solo añade errores y la captura de pantalla mostraría el gráfico en el monitor. Si se quiere, Moondream2 (≈ 4 GB) sobre un gráfico renderizado sin ventana. |
 | MemGPT (Letta) + ChromaDB | **Reemplazada por una memoria ligera** | La memoria de horas parecidas y el grafo de Obsidian cubren la consulta de patrones sin un servidor ni una base vectorial residente. Se puede sumar ChromaDB después si la memoria ligera se queda corta. |
-| Obsidian Git con push automático | **Pendiente** | La bóveda lleva saldos, decisiones y la memoria de Claude: solo a un repositorio privado. Claude y Codex ya comparten el diario de Supabase; el repositorio sería una copia. |
-| Correo de aprobación antes de cada operación | **Pendiente** | Contradice la decisión del 2026-09-30 (evento 34: tu silencio tras 1 minuto de veto es aprobación). |
-| Máximo 2,5 % del saldo por transacción | **Pendiente** | Con ≈ 20 USDT, el 2,5 % del saldo son 0,50 USDT: por debajo del mínimo de Binance (5 USDT), ninguna compra podría ejecutarse. Si es el riesgo máximo (pérdida hasta el stop), baja de 1,20 a 0,50 USDT. |
+| Obsidian Git con push automático | **Aprobada; configuración en curso** (2026-09-30) | Repositorio separado y privado para la bóveda. Es una copia navegable de Supabase y del repositorio de implementación; excluye credenciales, certificados y estado local de plugins. |
+| Correo de aprobación antes de cada operación | **Descartada por el usuario** (2026-09-30) | Sigue el evento 34: su silencio tras 1 minuto de veto es aprobación. |
+| Máximo 2,5 % del saldo por transacción | **Descartada por el usuario** (2026-09-30) | «Sigue trabajando con los parámetros que ya establecimos»: rigen los de `standing_authorizations` fila 4 (7 USDT por posición, pérdida 1,20, R:R 1,2, semanal 2,5 USDT). |
 | Abortar si spread > 0,2 % o deslizamiento > 0,15 % | **Adoptada** | En la guardia de cada nota y como regla de Codex antes de enviar la orden (`python -m tools.orquestador guardia <PAR>`). |
 
 ## 3. Esquema de la nota horaria
@@ -59,6 +60,10 @@ regenera en cada corrida.
 
 ## 4. Memoria
 
+- Supabase conserva el diario compartido append-only y sigue siendo la fuente canónica de análisis, propuestas, revisiones y operaciones.
+- La bitácora diaria de Codex se reconstruye desde `analyses` y se enlaza desde `Mente de Codex`; cada entrada conserva ciclo e identificador de procedencia.
+- Obsidian es la corteza asociativa: conecta contexto, protocolo y memorias, pero nunca autoriza una orden ni sustituye una comprobación directa en Binance o Supabase.
+- Para mantener el análisis a ciegas, Codex escribe primero su análisis del ciclo y no lee la tesis de Claude del mismo ciclo hasta haberlo hecho. Puede consultar ciclos ya cerrados.
 - Se mide antes de cada etapa pesada. TimesFM necesita ≥ 4,5 GB libres; si no los hay, la nota lo dice y la hora sigue.
 - Docker Desktop reserva RAM para su máquina virtual (WSL) aunque no haya contenedores: al abrirlo, la memoria libre
   bajó de 2,8 a 2,1 GB. Conviene fijarle un techo en `%UserProfile%\.wslconfig` (`[wsl2]` → `memory=4GB`) o cerrarlo
@@ -67,10 +72,8 @@ regenera en cada corrida.
 
 ## 5. Decisiones pendientes del usuario
 
-1. ¿El 2,5 % es tamaño de la orden (imposible con 20 USDT) o pérdida máxima por operación (0,50 USDT)?
-2. ¿Vuelve la aprobación por correo antes de cada compra, o sigue vigente el evento 34?
-3. ¿Se descarga FinBERT (≈ 440 MB) y se construye su imagen? ¿Y Moondream2 (≈ 4 GB) sobre un gráfico renderizado?
-4. ¿Se sube la bóveda a un repositorio privado con Obsidian Git?
-5. Mover el ciclo de Claude del minuto 02 al 05.
-6. Poner la clave de la Local REST API en `.env` como `OBSIDIAN_API_KEY` (la copia el usuario desde los ajustes del
+Resueltas el 2026-09-30: el 2,5 % y el correo previo quedan descartados, FinBERT va, el ciclo de Claude ya está en el minuto 05 y la bóveda tendrá repositorio privado.
+
+1. ¿Moondream2 (≈ 4 GB) sobre un gráfico renderizado? No cabe en esta PC con 12 GB (ver §4); iría en un servidor en la nube.
+2. Poner la clave de la Local REST API en `.env` como `OBSIDIAN_API_KEY` (la copia el usuario desde los ajustes del
    plugin; nunca pasa por el chat). Sin ella, el orquestador escribe los archivos directamente.

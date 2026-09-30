@@ -33,7 +33,7 @@ MAX_POST_BYTES = 2000
 
 
 def make_handler(state_provider, candles_provider, allowed_hosts, liquidity_provider=None, radar_provider=None,
-                 workspace_provider=None, predictions=None):
+                 workspace_provider=None, predictions=None, hourly_provider=None):
     class Handler(BaseHTTPRequestHandler):
         server_version = "ai-trading-lab"
         sys_version = ""
@@ -70,6 +70,8 @@ def make_handler(state_provider, candles_provider, allowed_hosts, liquidity_prov
                     return self._json(200, radar_provider())
                 if url.path == "/api/workspace" and workspace_provider:
                     return self._json(200, workspace_provider())
+                if url.path == "/api/hora" and hourly_provider:
+                    return self._json(200, hourly_provider())
                 if url.path == "/api/predicciones" and predictions:
                     return self._json(200, predictions.load_all())
                 if url.path == "/api/candles":
@@ -133,10 +135,10 @@ class LocalServer(ThreadingHTTPServer):
 
 
 def make_server(port, state_provider, candles_provider, liquidity_provider=None, radar_provider=None,
-                workspace_provider=None, predictions=None):
+                workspace_provider=None, predictions=None, hourly_provider=None):
     server = LocalServer(("127.0.0.1", port), None)
     real_port = server.server_address[1]
     allowed = {f"127.0.0.1:{real_port}", f"localhost:{real_port}"}
     server.RequestHandlerClass = make_handler(state_provider, candles_provider, allowed, liquidity_provider,
-                                              radar_provider, workspace_provider, predictions)
+                                              radar_provider, workspace_provider, predictions, hourly_provider)
     return server

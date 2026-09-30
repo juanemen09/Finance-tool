@@ -20,7 +20,7 @@
   const OFFLINE_SECONDS = 90;
   const SHIFT_PX = 8;
 
-  let state = null, radar = null, workspace = null, lastOk = 0, tickerKey = "", chartKey = "";
+  let state = null, radar = null, workspace = null, hourly = null, lastOk = 0, tickerKey = "", chartKey = "";
   let chart = null, candleSeries = null, priceLines = [], chartLoadedAt = 0;
   let current = 0, sectionStarted = Date.now(), pausedUntil = 0, lastForced = "";
   const seenFeed = new Set();
@@ -140,6 +140,65 @@
     };
   }
 
+  // Nota del orquestador (minuto 01): mercado de 1 h, banda de TimesFM a 4 h, guardia de ejecución y tono FinBERT.
+  const tsfmLine = (svc) => !svc ? "Servicio de TimesFM: sin datos." : svc.cargado
+    ? "TimesFM residente: modelo cargado, responde al instante."
+    : `TimesFM residente esperando memoria${svc.memoria_libre_gb != null ? ` (${num(svc.memoria_libre_gb, 1)} GB libres de 4,5)` : ""}: reintenta cada minuto.`;
+  const toneRing = (v) => ring((Number(v) + 1) / 2, signed(v, 2));
+
+  function secHour() {
+    const n = hourly?.nota, svc = hourly?.timesfm_servicio, ev = hourly?.evaluada;
+    if (!n) return { title: "Pulso horario", sub: "nota del orquestador del minuto 01", body: [empty(hourly ? "Todavía no hay notas horarias." : "Cargando la nota de la hora…"), h("p", { class: "sub", text: tsfmLine(svc) })] };
+    const SPAN = 0.03;
+    const pos = (v) => `${(Math.max(0, Math.min(1, (v + SPAN) / (2 * SPAN))) * 100).toFixed(1)}%`;
+    const rows = Object.entries(n.mercado || {}).map(([s, m]) => {
+      const st = (n.timesfm?.[s]?.steps || []).find((x) => x.h === 4);
+      const g = n.guardia?.[s] || {};
+      const band = h("div", { class: "range" }, h("u"), h("i"), h("b"));
+      if (st && m.precio) {
+        const rel = (v) => v / m.precio - 1;
+        band.children[0].style.left = pos(0);
+        band.children[1].style.left = pos(rel(st.p10));
+        band.children[1].style.width = `${((rel(st.p90) - rel(st.p10)) / (2 * SPAN) * 100).toFixed(1)}%`;
+        band.children[2].style.left = pos(rel(st.p50));
+      }
+      return h("tr", {}, h("td", {}, h("b", { text: s.replace("USDT", "") })),
+        h("td", { class: "num", text: num(m.precio, m.precio < 10 ? 4 : 2) }),
+        h("td", { class: `num ${tone(m.ret_1h_pct)}`, text: `${signed(m.ret_1h_pct, 2)} %` }),
+        h("td", { class: `num ${tone(m.ret_24h_pct)}`, text: `${signed(m.ret_24h_pct, 1)} %` }),
+        h("td", { class: "num", text: num(m.rsi14, 0) }),
+        h("td", {}, st ? band : h("span", { class: "sub", text: "—" })),
+        h("td", { class: "num" }, g.abortar ? badge("ABORTAR", "bad") : badge(`${num(g.spread_pct, 3)} %`, "ok")));
+    });
+    const fb = n.finbert, sent = n.sentimiento || {};
+    const agents = n.agentes || {};
+    const quito = quitoFmt.format(new Date(n.hora));
+    return {
+      title: `Pulso horario · ${quito} de Quito`, sub: `nota ${n.nombre} · orquestador 01 → Claude 05 → Codex 15 · contexto en papel, no señal`,
+      body: [h("table", { class: "t" },
+        h("tr", {}, h("th", { text: "" }), h("th", { class: "num", text: "Precio" }), h("th", { class: "num", text: "1 h" }), h("th", { class: "num", text: "24 h" }),
+          h("th", { class: "num", text: "RSI" }), h("th", { text: "TimesFM 4 h · banda p10–p90 (±3 %)" }), h("th", { class: "num", text: "Spread / guardia" })), rows),
+      h("div", { class: "grid-3 stagger" },
+        h("div", { class: "tile" }, h("h3", { text: "Tono de titulares 24 h" }),
+          fb && fb.n ? [toneRing(fb.mercado), h("div", { class: "sub", text: `FinBERT · ${fb.n} titulares · ${fb.positivos} positivos, ${fb.negativos} negativos · VADER ${num(sent.tono_mercado, 2)}` }),
+            ...(fb.mas_negativo || []).slice(0, 1).map((x) => h("p", { class: "clamp down", text: `▼ ${x.titulo}` })),
+            ...(fb.mas_positivo || []).slice(0, 1).map((x) => h("p", { class: "clamp up", text: `▲ ${x.titulo}` }))]
+            : [h("div", { class: "big", text: num(sent.tono_mercado, 2) }), h("div", { class: "sub", text: fb?.error ? `VADER · FinBERT no corrió: ${fb.error}` : "VADER · FinBERT aún sin correr" })]),
+        h("div", { class: "tile" }, h("h3", { text: "TimesFM residente" }),
+          badge(svc?.cargado ? "cargado" : "esperando memoria", svc?.cargado ? "ok" : "mid"),
+          h("p", { class: "sub", text: tsfmLine(svc) }),
+          n.timesfm_error ? h("p", { class: "sub", text: `Esta hora: ${n.timesfm_error}.` }) : null,
+          h("p", { class: "sub", text: "Sube si liberas RAM: cerrar el Supabase local que no uses o reiniciar Claude Desktop." })),
+        h("div", { class: "tile" }, h("h3", { text: "Memoria y tesis" }),
+          h("div", { class: "sub", text: "Horas pasadas más parecidas:" }),
+          (n.similares || []).length ? h("ul", { class: "list" }, n.similares.map((x) => h("li", {}, h("span", { text: x.nombre }), h("span", { class: "sub", text: `distancia ${num(x.distancia, 2)}` }))))
+            : empty("Aún no hay memoria suficiente."),
+          h("div", { class: "sub", text: `Esta hora · Claude ${agents.claude?.accion || "—"} · Codex ${agents.chatgpt?.accion || "—"}` }),
+          ev ? h("div", {}, h("span", { class: "sub", text: `A 4 h de ${ev.nombre}: ` }), badge(ev.resultado, ev.resultado === "exitosa" ? "ok" : ev.resultado === "fallida" ? "bad" : ""),
+            ...(ev.tags || []).map((t) => h("span", { class: "chip", text: `#${t}` }))) : null))],
+    };
+  }
+
   function secAgents() {
     const score = Object.fromEntries((state.scoreboard || []).map((s) => [s.agent_id, s]));
     const sa = state.standing_authorization || {}, limits = state.risk_limits || {};
@@ -222,7 +281,8 @@
         h("tr", {}, h("th", { text: "" }), h("th", { class: "num", text: "1 día" }), h("th", { class: "num", text: "3 días" }), h("th", { class: "num", text: "7 días" }), h("th", { text: "7 días · banda (−20 % a +20 %)" })), rows)
         : empty("Aún no hay pronósticos: la tarea corre a las 19:10 de Quito."),
       h("div", { class: "grid-3 stagger" }, skill.length ? skill : [empty("Todavía no venció ningún pronóstico.")]),
-      h("p", { class: "sub", text: "Se decide a los 60 cierres (≈ 6 dic): skill > 0 con IC 95 %, dirección > 55 % y banda 70–90 %." })],
+      h("p", { class: "sub", text: "Se decide a los 60 cierres (≈ 6 dic): skill > 0 con IC 95 %, dirección > 55 % y banda 70–90 %." }),
+      h("p", { class: "sub", text: tsfmLine(hourly?.timesfm_servicio) })],
     };
   }
 
@@ -260,6 +320,7 @@
           h("div", { class: "sub", text: fg?.label || "" }),
           h("div", { class: "sub", text: `Stablecoins ${bn(metric("stablecoin_supply_usd"))} USD · RWA ${bn(metric("rwa_tvl_usd"))} USD` })),
         h("div", { class: "tile" }, h("h3", { text: "Derivados y tono 24 h" }),
+          hourly?.nota?.finbert?.n ? h("div", { class: "sub", text: `FinBERT (finanzas) ${signed(hourly.nota.finbert.mercado, 2)} sobre ${hourly.nota.finbert.n} titulares · la tabla usa VADER` }) : null,
           h("table", { class: "t" }, h("tr", {}, h("th", { text: "" }), h("th", { class: "num", text: "Funding" }), h("th", { class: "num", text: "Largo/corto" }), h("th", { class: "num", text: "Tono" })),
             ["BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "ONDOUSDT"].map((s) => h("tr", {}, h("td", { text: s.replace("USDT", "") }),
               h("td", { class: "num", text: bySym[s] ? pct(bySym[s].funding_rate, 3) : "—" }),
@@ -434,7 +495,7 @@
   }
 
   const SECTIONS = [
-    ["Mercado", secMarket], ["Agentes", secAgents], ["Estrategias", secStrategies], ["TimesFM", secForecast],
+    ["Mercado", secMarket], ["Hora", secHour], ["Agentes", secAgents], ["Estrategias", secStrategies], ["TimesFM", secForecast],
     ["Predicciones", secPredictions], ["Tesis IA", secThesis], ["Sentimiento", secSentiment], ["Money Printer", secMoney], ["Zyneath", secZyneath], ["Equipo", secTeam],
   ];
 
@@ -641,6 +702,9 @@
   async function refreshRadar() {
     try { radar = await getJSON("/api/radar"); if (state) { renderTop(); pushScene(); if (current === 0) paintFace(true); } } catch (e) { console.error("radar", e); }
   }
+  async function refreshHourly() {
+    try { hourly = await getJSON("/api/hora"); if (state && ["Hora", "TimesFM", "Sentimiento"].includes(SECTIONS[current][0])) paintFace(true); } catch (e) { console.error("hora", e); }
+  }
   async function refreshWorkspace() {
     try { workspace = await getJSON("/api/workspace"); if (state && ["Money Printer", "Zyneath", "Equipo"].includes(SECTIONS[current][0])) paintFace(true); } catch (e) { console.error("workspace", e); }
   }
@@ -743,6 +807,19 @@
     link("ag:claude", "sent", "recoge");
     for (const t of (state.sentiment?.tone_24h || []).filter((x) => x.items > 0)) if (graphNodes.has(`as:${t.symbol}`)) link("sent", `as:${t.symbol}`, `tono ${num(t.avg_sentiment, 2)}`, 0.3);
 
+    const hn = hourly?.nota;
+    if (hn) {
+      const hsvc = hourly.timesfm_servicio;
+      add("hour", `Nota ${hn.nombre.slice(11)}`, "forecast", 1.1, [`Orquestador del minuto 01 · ${hn.nombre}`,
+        hn.finbert?.n ? `FinBERT ${signed(hn.finbert.mercado, 2)} sobre ${hn.finbert.n} titulares` : null,
+        hsvc?.cargado ? "TimesFM residente cargado" : "TimesFM residente esperando memoria",
+        Object.values(hn.guardia || {}).some((g) => g.abortar) ? "Guardia: algún par con libro malo" : "Guardia: todos los pares operables"]);
+      link("hour", "lab", "prepara", 0.8);
+      link("hour", "tsfm", "banda 4 h", 0.6);
+      link("hour", "sent", "tono FinBERT", 0.6);
+      link("ag:claude", "hour", "lee a los 05", 0.6);
+      link("ag:chatgpt", "hour", "lee a los 15", 0.6);
+    }
     const th = state.ai_thesis || {};
     add("thesis", "Tesis IA", "research", 1.3, [th.AI_BOTTLENECK ? th.AI_BOTTLENECK.title : "Informe mensual del día 25", "13F de Situational Awareness, capex y oferta física"]);
     link("ag:claude", "thesis", "investiga");
@@ -843,7 +920,7 @@
   // Recorrido automático cuando nadie toca nada: va de nodo en nodo por lo más importante y muestra su ficha.
   function graphTour() {
     if (!graphOn || !window.TV3D || !window.TV3D.graphIdle() || Date.now() < graphTourAt) return;
-    const order = ["lab", "ag:claude", "ag:chatgpt", "binance", "proposal", "position", "rules", "tsfm", "thesis", "sent", "money", "zyneath", "founder",
+    const order = ["lab", "ag:claude", "ag:chatgpt", "binance", "proposal", "position", "rules", "hour", "tsfm", "thesis", "sent", "money", "zyneath", "founder",
       ...[...graphNodes.keys()].filter((k) => k.startsWith("as:") || k.startsWith("st:") || k.startsWith("pj:"))].filter((k) => graphNodes.has(k));
     const id = order[graphTourIdx++ % order.length];
     window.TV3D.focus(id);
@@ -894,7 +971,7 @@
     $("stage").style.transform = `translate(${r()}px, ${r()}px)`;
   };
 
-  // /tv#7 abre directamente la sección 7 (Money Printer); sin número, empieza por el mercado.
+  // /tv#9 abre directamente la sección 9 (Money Printer); sin número, empieza por el mercado.
   const fromHash = Number(location.hash.slice(1));
   if (fromHash >= 1 && fromHash <= SECTIONS.length) current = fromHash - 1;
   if (window.TV3D) window.TV3D.set({ section: current });
@@ -902,7 +979,8 @@
   document.body.classList.add("idle");
   tick();
   setInterval(tick, 1000);
-  Promise.all([refreshRadar(), refreshWorkspace(), refreshPredictions()]).then(refreshState);
+  Promise.all([refreshRadar(), refreshWorkspace(), refreshPredictions(), refreshHourly()]).then(refreshState);
+  setInterval(refreshHourly, 60_000);
   setInterval(refreshPredictions, 60_000);
   setInterval(refreshState, 20_000);
   setInterval(refreshRadar, 30_000);

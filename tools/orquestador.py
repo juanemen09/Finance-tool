@@ -10,7 +10,9 @@ Plano minuto a minuto en docs/plans/pipeline-horario.md. Resumen de la corrida:
      marca `abortar` si el spread > 0,2 % o el deslizamiento > 0,15 % (regla que aplica Codex, AGENTS.md).
   3. Sentimiento: Fear & Greed y tono de titulares del diario (rol dashboard_reader).
   4. TimesFM 1-4 h: proceso efímero con su propio Python; al terminar libera toda su memoria.
-  5. Contenedores opcionales (FinBERT, visión) de config/orquestador.json: `docker run --rm` con límite de memoria.
+  5. Etapas opcionales de config/orquestador.json: FinBERT puntúa los titulares como proceso efímero con su propio
+     Python (un contenedor haría crecer la máquina virtual de Docker, que no devuelve la memoria a Windows); las de
+     tipo imagen corren con `docker run --rm` y límite de memoria.
   6. Memoria semántica: las horas pasadas más parecidas quedan enlazadas como patrones.
   7. Nota de la hora por la Local REST API de Obsidian (si Obsidian está cerrado, se escribe el archivo), y se
      completan las horas previas con la tesis de cada agente y su resultado (#tesis-exitosa, #tesis-fallida, #anomalia).
@@ -20,6 +22,7 @@ import argparse
 import gc
 import json
 import math
+import os
 import ssl
 import subprocess
 import sys
@@ -215,6 +218,7 @@ def frontmatter(record, outcome):
     fm = {"tipo": "hora", "hora_utc": record["hora"], "ciclo": record["ciclo"], "fuente": "ai-trading-lab",
           "fear_greed": record.get("sentimiento", {}).get("fear_greed"),
           "sentimiento_mercado": record.get("sentimiento", {}).get("tono_mercado"),
+          "sentimiento_finbert": record.get("sentimiento", {}).get("finbert"),
           "tesis_claude": (record.get("agentes") or {}).get("claude", {}).get("accion"),
           "tesis_codex": (record.get("agentes") or {}).get("chatgpt", {}).get("accion"),
           "resultado": outcome["resultado"], "guardia_abortar": any(g.get("abortar") for g in (record.get("guardia") or {}).values())}
@@ -266,6 +270,16 @@ def note_body(record, prev_name, similar, outcome):
     sent = record.get("sentimiento") or {}
     lines += ["", "## [[Sentimiento]]", f"Fear & Greed {_fmt(sent.get('fear_greed'), 0)} · tono de titulares 24 h {_fmt(sent.get('tono_mercado'))} "
               f"({sent.get('modelo', 'VADER')})."]
+    fb = (record.get("contenedores") or {}).get("finbert") or {}
+    if fb.get("n"):
+        per = ", ".join(f"{k.replace('USDT', '')} {_fmt(v['tono'])}" for k, v in fb.get("por_activo", {}).items())
+        lines.append(f"FinBERT sobre {fb['n']} titulares: {_fmt(fb.get('mercado'))} ({fb.get('positivos', 0)} positivos, "
+                     f"{fb.get('negativos', 0)} negativos){' · ' + per if per else ''}.")
+        for key, label in (("mas_negativo", "Más negativo"), ("mas_positivo", "Más positivo")):
+            for x in fb.get(key) or []:
+                lines.append(f"- {label} ({_fmt(x['tono'])}): {x['titulo']}")
+    elif fb.get("error"):
+        lines.append(f"FinBERT no corrió: {fb['error']}.")
     ag = record.get("agentes") or {}
     lines += ["", "## Tesis de los agentes"]
     if ag:
@@ -397,28 +411,53 @@ def stage_timesfm(budget):
     return json.loads(r.stdout.strip().splitlines()[-1]), None
 
 
-def run_container(image, args, memory="2g", timeout=120, run=subprocess.run):
-    """Contenedor efímero: `--rm` lo destruye al terminar y `--memory` le pone techo. Devuelve el JSON que imprime."""
-    cmd = ["docker", "run", "--rm", "--memory", memory, "--cpus", "2", "--network", "none", image, *args]
-    r = run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=timeout, creationflags=NO_WINDOW)
+def _last_json(r, name):
     if r.returncode != 0:
-        raise RuntimeError(f"{image}: código {r.returncode}")
+        last = (r.stderr or "").strip().splitlines()[-1:] or [""]
+        raise RuntimeError(f"{name}: código {r.returncode} {last[0][-160:]}".strip())
     return json.loads(r.stdout.strip().splitlines()[-1])
 
 
-def stage_containers(config, context, budget, run=subprocess.run):
-    """Etapas opcionales en contenedores (FinBERT, visión...). Solo corren las marcadas `activo` en
-    config/orquestador.json y cuyas imágenes ya estén descargadas: el orquestador nunca descarga nada."""
+def run_container(image, args, memory="2g", timeout=120, run=subprocess.run, payload=""):
+    """Contenedor efímero: `--rm` lo destruye al terminar y `--memory` le pone techo. El contexto entra por la
+    entrada estándar (la línea de comandos de Windows se queda corta con 200 titulares). Devuelve el JSON que imprime."""
+    cmd = ["docker", "run", "--rm", "--memory", memory, "--cpus", "2", "--network", "none", "-i", image, *args]
+    r = run(cmd, input=payload, capture_output=True, text=True, encoding="utf-8", timeout=timeout, creationflags=NO_WINDOW)
+    return _last_json(r, image)
+
+
+def run_process(python, module, payload, timeout=120, run=subprocess.run):
+    """Proceso efímero con otro Python: carga su modelo, imprime un JSON y muere; Windows recupera toda su memoria."""
+    r = run([python, "-m", module], input=payload, cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
+            timeout=timeout, creationflags=NO_WINDOW)
+    return _last_json(r, module)
+
+
+def stage_containers(config, context, budget, run=subprocess.run, free=None):
+    """Etapas opcionales (FinBERT, visión...). Solo corren las marcadas `activo` en config/orquestador.json, con su
+    modelo o imagen ya en esta PC (el orquestador nunca descarga nada) y si queda la memoria que piden."""
     out = {}
     for c in config.get("contenedores", []):
         if not c.get("activo") or budget() < 30:
             continue
+        need = c.get("memoria_min_gb")
+        left = (free or free_gb)() if need else None
+        if left is not None and left < need:
+            out[c["nombre"]] = {"error": f"memoria libre {left:.1f} GB < {need} GB"}
+            continue
         try:
             payload = json.dumps(context, ensure_ascii=False, default=str)
-            out[c["nombre"]] = run_container(c["imagen"], [*c.get("args", []), payload], c.get("memoria", "2g"),
-                                             min(c.get("timeout", 90), int(budget()) - 10), run=run)
+            timeout = min(c.get("timeout", 90), int(budget()) - 10)
+            if c.get("python"):
+                python = os.path.expandvars(c["python"])
+                if not Path(python).exists():
+                    out[c["nombre"]] = {"error": "no está instalado su entorno"}
+                    continue
+                out[c["nombre"]] = run_process(python, c["modulo"], payload, timeout, run=run)
+            else:
+                out[c["nombre"]] = run_container(c["imagen"], c.get("args", []), c.get("memoria", "2g"), timeout, run=run, payload=payload)
         except Exception as error:  # una etapa opcional caída no detiene la nota
-            out[c["nombre"]] = {"error": type(error).__name__}
+            out[c["nombre"]] = {"error": f"{type(error).__name__}: {error}"[:220] if isinstance(error, RuntimeError) else type(error).__name__}
         finally:
             gc.collect()
     return out
@@ -433,13 +472,16 @@ def stage_journal(url, cycles):
         tone = conn.execute("select avg_sentiment from v_news_sentiment_24h where symbol = 'MERCADO'").fetchone()
         rows = conn.execute("select distinct on (agent_id, cycle_id) agent_id, cycle_id, proposed_action, symbol, market_regime "
                             "from analyses where cycle_id = any(%s) order by agent_id, cycle_id, id desc", (cycles,)).fetchall()
+        news = conn.execute("select title, symbols from news_items where published_at > now() - interval '24 hours' "
+                            "order by published_at desc limit 200").fetchall()
     agents = {}
     for r in rows:
         agents.setdefault(r["cycle_id"], {})[r["agent_id"]] = {"accion": r["proposed_action"], "simbolo": r["symbol"],
                                                                "regimen": r["market_regime"] or ""}
     sentiment = {"fear_greed": float(fg["value"]) if fg else None,
                  "tono_mercado": float(tone["avg_sentiment"]) if tone and tone["avg_sentiment"] is not None else None, "modelo": "VADER"}
-    return sentiment, agents
+    headlines = [{"titulo": n["title"], "simbolos": list(n["symbols"] or [])} for n in news]
+    return sentiment, agents, headlines
 
 
 # ---------------------------------------------------------------- corrida
@@ -492,13 +534,16 @@ def main(argv=None):
     revisit = [r for r in memory if hour - datetime.fromisoformat(r["hora"]) <= timedelta(hours=REVISIT_HOURS)]
     cycles = [record["ciclo"], *[r["ciclo"] for r in revisit]]
     try:
-        sentiment, agents = stage_journal(env.get("DASHBOARD_DATABASE_URL", ""), cycles)
+        sentiment, agents, headlines = stage_journal(env.get("DASHBOARD_DATABASE_URL", ""), cycles)
     except Exception as error:
-        sentiment, agents = {}, {}
+        sentiment, agents, headlines = {}, {}, []
         log(f"error en el diario: {type(error).__name__}")
     record["sentimiento"] = sentiment
     record["timesfm"], record["timesfm_error"] = stage_timesfm(int(budget()) - 40)
-    record["contenedores"] = stage_containers(config, {"mercado": record["mercado"], "hora": record["hora"]}, budget)
+    record["contenedores"] = stage_containers(config, {"mercado": record["mercado"], "hora": record["hora"], "titulares": headlines}, budget)
+    fb = record["contenedores"].get("finbert") or {}
+    if fb.get("mercado") is not None:
+        record["sentimiento"]["finbert"] = fb["mercado"]
     record["similares"] = similar_hours(memory, record)
 
     obsidian = Obsidian(local["obsidian_vault"], env.get("OBSIDIAN_API_URL", "https://127.0.0.1:27124"), env.get("OBSIDIAN_API_KEY", ""))

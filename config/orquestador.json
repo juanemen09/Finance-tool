@@ -1,9 +1,10 @@
 {
-  "_nota": "Etapas opcionales en contenedores efímeros (docker run --rm, con techo de memoria y sin red). El orquestador nunca descarga imágenes: se activan cuando la imagen ya existe en esta PC. Cada imagen recibe el contexto como último argumento (JSON) y debe imprimir un JSON en la última línea.",
+  "_nota": "Etapas opcionales de la nota horaria. El orquestador nunca descarga nada: cada etapa corre solo si su entorno o su imagen ya están en esta PC y si queda la memoria libre que pide (memoria_min_gb). Con `python` + `modulo` es un proceso efímero con ese Python; con `imagen`, un contenedor efímero (docker run --rm, con techo de memoria y sin red). Ambos reciben el contexto en JSON por la entrada estándar e imprimen un JSON en la última línea.",
   "contenedores": [
-    {"nombre": "finbert", "imagen": "ai-trading-lab/finbert:local", "activo": false, "memoria": "2g", "timeout": 60,
-     "que_hace": "Puntúa el tono financiero de los titulares de -1 a 1 (ProsusAI/finbert)."},
-    {"nombre": "vision", "imagen": "ai-trading-lab/moondream2:local", "activo": false, "memoria": "5g", "timeout": 90,
-     "que_hace": "Describe un gráfico renderizado sin ventana desde las velas (no captura de pantalla)."}
+    {"nombre": "finbert", "python": "%LOCALAPPDATA%\\ai-trading-lab\\finbert\\venv\\Scripts\\python.exe", "modulo": "tools.finbert_score",
+     "activo": true, "memoria_min_gb": 1.2, "timeout": 140,
+     "que_hace": "Puntúa el tono financiero de los titulares de 24 h de -1 a 1 (ProsusAI/finbert, revisión fijada). Contexto, no señal."},
+    {"nombre": "vision", "imagen": "ai-trading-lab/moondream2:local", "activo": false, "memoria": "5g", "memoria_min_gb": 5.5, "timeout": 90,
+     "que_hace": "Describe un gráfico renderizado sin ventana desde las velas (no captura de pantalla). Pendiente: no cabe en 12 GB de RAM."}
   ]
 }

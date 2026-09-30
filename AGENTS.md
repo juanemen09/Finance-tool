@@ -148,6 +148,9 @@ públicos en dos tablas append-only:
   (decrypt.co y watcher.guru), con los activos mencionados y una puntuación de tono (VADER con léxico cripto,
   `sentiment_model`). Solo título y enlace, nunca el artículo.
 - Vistas: `v_sentiment_latest` (último valor de cada indicador) y `v_news_sentiment_24h` (tono por activo).
+- Desde el 2026-09-30 la nota horaria (`data/raw/horas/actual.md`, sección «Sentimiento») trae además el tono de
+  **FinBERT** (modelo financiero, de -1 a 1) sobre los titulares de 24 h, por activo y con el titular más negativo y el más
+  positivo. Es la misma clase de dato que VADER: contexto, no señal.
 
 Reglas:
 - **No es una señal validada.** Ningún agente propone, aprueba ni rechaza una operación solo por el sentimiento.
