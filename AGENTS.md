@@ -225,6 +225,20 @@ devuelve `auto_ok = true`, es decir, si se cumplen TODAS estas condiciones:
 debe decir que tiene 1 minuto para vetarla (lo que diga la última fila de `standing_authorizations`). Nada de esto cambia la regla de salida: los stops y las salidas
 por señal nunca requieren autorización.
 
+## Modo TV y vigilante de agentes (pedido del usuario, 2026-09-30)
+
+- **Modo TV:** `http://127.0.0.1:8765/tv` muestra en el segundo monitor lo esencial y en letra grande: piloto
+  automático, saldo, posición con ganancia en vivo y distancia al stop, cuenta regresiva del veto con el texto para
+  vetar, salud de los agentes, alertas abiertas, radar de S-CHANNEL-1D y titulares. Solo lectura. La abre al iniciar
+  sesión la tarea de Windows «AI Trading Lab\Modo TV» (`tools/tv_launch.py`), que también arranca el panel si no está.
+- **Salud de cada agente según su ritmo** (`dashboard/health.py`, la misma regla en el panel, la TV y el vigilante):
+  Claude está atrasado si pasa más de 75 min sin escribir en el diario. Codex lo está si no escribió desde las 00:00 UTC
+  del último día cuya ventana ya cerró (02:00 UTC), o si su buzón tiene mensajes sin atender hace más de 4 h 45 min.
+- **Vigilante:** la tarea «AI Trading Lab\Vigilante de agentes» (`tools/agent_watchdog.py`, cada 15 min, fuera de los
+  agentes) avisa al usuario con una notificación de Windows y, si el usuario configuró una contraseña de aplicación
+  de Gmail en `.env`, por correo. Avisa una vez por incidente, de nuevo a las 12 h y al recuperarse. Si un agente ve
+  que el otro está atrasado, no hace nada distinto: el protocolo de respaldo de arriba sigue igual.
+
 ## Equipo humano (pedido del usuario, 2026-09-27)
 
 La startup suma personas (onboarding en `docs/team/`, módulo `python -m team`). Quedan registradas en

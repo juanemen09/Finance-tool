@@ -8,8 +8,9 @@ from decimal import Decimal
 from pathlib import Path
 
 from dashboard.config import load_env
-from dashboard.market import MarketError, candles_payload, liquidity_payload, validate_candles_request
-from dashboard.queries import agent_health, build_state, equity_curve, next_daily_close, to_jsonable
+from dashboard.health import agent_health
+from dashboard.market import MarketError, candles_payload, liquidity_payload, radar_row, validate_candles_request
+from dashboard.queries import build_state, equity_curve, next_daily_close, to_jsonable
 from dashboard.server import make_server
 
 NOW = datetime(2026, 9, 24, 6, 30, tzinfo=timezone.utc)
@@ -57,16 +58,53 @@ class ShapingTest(unittest.TestCase):
     def test_next_daily_close(self):
         self.assertEqual(next_daily_close(NOW), datetime(2026, 9, 25, tzinfo=timezone.utc))
 
-    def test_agent_health_flags_stale_agents(self):
-        rows = [{"agent_id": "claude", "created_at": datetime(2026, 9, 24, 6, 2, tzinfo=timezone.utc)},
-                {"agent_id": "chatgpt", "created_at": datetime(2026, 9, 24, 3, 0, tzinfo=timezone.utc)}]
-        health = {h["agent_id"]: h for h in agent_health(rows, NOW)}
-        self.assertEqual(health["claude"]["state"], "ok")
+    @staticmethod
+    def health_at(now, claude, chatgpt, pending=()):
+        rows = [{"agent_id": "claude", "created_at": claude}, {"agent_id": "chatgpt", "created_at": chatgpt}]
+        return {h["agent_id"]: h for h in agent_health(rows, list(pending), now)}
+
+    def test_claude_is_late_after_75_minutes(self):
+        health = self.health_at(NOW, datetime(2026, 9, 24, 5, 10, tzinfo=timezone.utc),
+                                datetime(2026, 9, 24, 0, 20, tzinfo=timezone.utc))
+        self.assertEqual(health["claude"]["state"], "atrasado")
+        self.assertIn("80 min", health["claude"]["reason"])
+
+    def test_codex_writing_once_a_day_is_not_late(self):
+        # Codex escribe a las 00:20 UTC y no vuelve a escribir: seis horas después sigue al día.
+        health = self.health_at(NOW, datetime(2026, 9, 24, 6, 2, tzinfo=timezone.utc),
+                                datetime(2026, 9, 24, 0, 20, tzinfo=timezone.utc))
+        self.assertEqual((health["claude"]["state"], health["chatgpt"]["state"]), ("ok", "ok"))
+        self.assertEqual(health["chatgpt"]["minutes_since"], 370)
+
+    def test_codex_missing_its_daily_cycle_is_late(self):
+        health = self.health_at(NOW, datetime(2026, 9, 24, 6, 2, tzinfo=timezone.utc),
+                                datetime(2026, 9, 23, 20, 15, tzinfo=timezone.utc))
         self.assertEqual(health["chatgpt"]["state"], "atrasado")
-        self.assertEqual(health["chatgpt"]["minutes_since"], 210)
+        self.assertIn("2026-09-24T00Z", health["chatgpt"]["reason"])
+
+    def test_codex_window_still_open_before_0200_utc(self):
+        # A las 01:30 UTC la ventana de hoy sigue abierta: basta con el análisis del día anterior.
+        now = datetime(2026, 9, 24, 1, 30, tzinfo=timezone.utc)
+        health = self.health_at(now, datetime(2026, 9, 24, 1, 6, tzinfo=timezone.utc),
+                                datetime(2026, 9, 23, 0, 20, tzinfo=timezone.utc))
+        self.assertEqual(health["chatgpt"]["state"], "ok")
+
+    def test_unattended_mailbox_makes_codex_late(self):
+        pending = [{"to_agent_id": "chatgpt", "n": 2, "oldest": datetime(2026, 9, 24, 1, 0, tzinfo=timezone.utc)}]
+        health = self.health_at(NOW, datetime(2026, 9, 24, 6, 2, tzinfo=timezone.utc),
+                                datetime(2026, 9, 24, 0, 20, tzinfo=timezone.utc), pending)
+        self.assertEqual(health["chatgpt"]["state"], "atrasado")
+        self.assertIn("2 mensaje(s)", health["chatgpt"]["reason"])
+        self.assertEqual(health["chatgpt"]["pending_messages"], 2)
+
+    def test_recent_mailbox_is_fine(self):
+        pending = [{"to_agent_id": "chatgpt", "n": 1, "oldest": datetime(2026, 9, 24, 5, 0, tzinfo=timezone.utc)}]
+        health = self.health_at(NOW, datetime(2026, 9, 24, 6, 2, tzinfo=timezone.utc),
+                                datetime(2026, 9, 24, 0, 20, tzinfo=timezone.utc), pending)
+        self.assertEqual(health["chatgpt"]["state"], "ok")
 
     def test_agent_without_rows_is_silent(self):
-        health = {h["agent_id"]: h for h in agent_health([], NOW)}
+        health = {h["agent_id"]: h for h in agent_health([], [], NOW)}
         self.assertEqual(health["chatgpt"]["state"], "sin actividad")
 
     def test_equity_counts_usdt_and_flags_other_assets(self):
@@ -103,6 +141,24 @@ class MarketTest(unittest.TestCase):
         self.assertEqual(payload["channel"][25]["entry_level"], max(101 + i for i in range(5, 25)))
         self.assertEqual(payload["channel"][25]["exit_level"], min(99 + i for i in range(15, 25)))
 
+    def test_radar_uses_closed_candles_for_levels_and_live_price(self):
+        from ai_trading_lab.candles import Candle
+        day = 86_400_000
+        closed = [Candle(i * day, (i + 1) * day - 1, 100, 110 + i, 90 + i, 100 + i, 10) for i in range(25)]
+        forming = Candle(25 * day, 26 * day - 1, 124, 200, 50, 130, 1)  # máximo y mínimo extremos a medio día
+        row = radar_row("BTCUSDT", closed + [forming], now_ms=25 * day + 1000)
+        self.assertEqual(row["price"], 130)
+        self.assertEqual(row["entry_level"], 110 + 24)  # la vela en formación no mueve el nivel
+        self.assertEqual(row["exit_level"], 90 + 15)
+        self.assertAlmostEqual(row["gap_to_entry"], 134 / 130 - 1)
+        self.assertTrue(row["in_strategy"])
+        self.assertFalse(radar_row("ONDOUSDT", closed, now_ms=25 * day + 1000)["in_strategy"])
+
+    def test_radar_needs_twenty_days(self):
+        from ai_trading_lab.candles import Candle
+        with self.assertRaises(MarketError):
+            radar_row("BTCUSDT", [Candle(0, 86_399_999, 1, 1, 1, 1, 1)], now_ms=86_400_000)
+
 
 class LiquidityTest(unittest.TestCase):
     def test_growth_lags_one_day(self):
@@ -120,7 +176,8 @@ class ServerTest(unittest.TestCase):
     def setUpClass(cls):
         cls.server = make_server(0, state_provider=lambda: {"ok": True},
                                  candles_provider=lambda s, i: {"symbol": s, "interval": i, "candles": []},
-                                 liquidity_provider=lambda: {"supply": [], "growth_30d": []})
+                                 liquidity_provider=lambda: {"supply": [], "growth_30d": []},
+                                 radar_provider=lambda: {"rows": []})
         cls.port = cls.server.server_address[1]
         threading.Thread(target=cls.server.serve_forever, daemon=True).start()
 
@@ -169,6 +226,17 @@ class ServerTest(unittest.TestCase):
         for path in ["/static/../../.env", "/static/..%2F..%2F.env", "/.env", "/static/nope.js"]:
             status, _, _ = self.get(path)
             self.assertEqual(status, 404, path)
+
+    def test_tv_page_and_assets(self):
+        for path, marker in [("/tv", b"/static/tv.js"), ("/static/tv.js", b"wakeLock"), ("/static/tv.css", b".veto")]:
+            status, headers, body = self.get(path)
+            self.assertEqual(status, 200, path)
+            self.assertIn(marker, body, path)
+            self.assertIn("default-src 'self'", headers["Content-Security-Policy"])
+
+    def test_radar_endpoint(self):
+        status, _, body = self.get("/api/radar")
+        self.assertEqual((status, json.loads(body)), (200, {"rows": []}))
 
     def test_liquidity_endpoint(self):
         status, _, body = self.get("/api/liquidity")

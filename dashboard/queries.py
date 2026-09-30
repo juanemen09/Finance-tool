@@ -5,8 +5,7 @@
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
-STALE_MINUTES = 75  # ambos agentes escriben un análisis por hora
-AGENTS = ("claude", "chatgpt")
+from dashboard.health import agent_health
 
 SQL = {
     "portfolio": "select balances, open_orders, observed_at from v_latest_portfolio",
@@ -27,6 +26,8 @@ SQL = {
                 " union all select acked_by_agent_id, created_at from message_acks"
                 " union all select reviewer_agent_id, created_at from risk_reviews"
                 " union all select agent_id, created_at from portfolio_snapshots) x group by agent_id",
+    "pending": "select to_agent_id, count(*) as n, min(created_at) as oldest from v_pending_messages "
+               "group by to_agent_id",
     "scoreboard": "select * from v_agent_scoreboard",
     "analyses_count": "select agent_id, count(*) as n from analyses group by agent_id",
     "strategies": "select strategy_id, name, status, status_reason, status_since, last_verdict, last_run_at "
@@ -34,8 +35,9 @@ SQL = {
     "signals": "select distinct on (strategy_id, symbol) strategy_id, symbol, signal, entry_price, stop, cycle_id, "
                "bar_close_time from strategy_signals order by strategy_id, symbol, id desc",
     "proposals": "select *, case when status not in ('EXECUTED', 'EXPIRED') "
-                 "then auto_authorization_status(proposal_id, now()) end as auto "
-                 "from v_proposal_status order by created_at desc limit 5",
+                 "then auto_authorization_status(proposal_id, now()) end as auto, "
+                 "(select r.created_at from risk_reviews r where r.review_id = v.last_review_id) as last_review_at "
+                 "from v_proposal_status v order by created_at desc limit 5",
     "sentiment": "select source, metric, symbol, value, label, observed_at from v_sentiment_latest",
     "tone": "select * from v_news_sentiment_24h order by items desc",
     "news": "select source, author, title, url, published_at, symbols, sentiment from news_items "
@@ -91,20 +93,6 @@ def next_daily_close(now):
     return datetime(now.year, now.month, now.day, tzinfo=timezone.utc) + timedelta(days=1)
 
 
-def agent_health(activity_rows, now):
-    last = {r["agent_id"]: r["created_at"] for r in activity_rows}
-    out = []
-    for agent in AGENTS:
-        at = last.get(agent)
-        if at is None:
-            out.append({"agent_id": agent, "last_activity": None, "minutes_since": None, "state": "sin actividad"})
-            continue
-        minutes = int((now - at).total_seconds() // 60)
-        out.append({"agent_id": agent, "last_activity": at, "minutes_since": minutes,
-                    "state": "ok" if minutes <= STALE_MINUTES else "atrasado"})
-    return out
-
-
 def equity_curve(rows):
     """USDT libre + bloqueado por foto. Otros activos se señalan: el panel no inventa su valor."""
     points = []
@@ -130,7 +118,7 @@ def build_state(run_query, now):
         "pnl_7d": q["pnl_7d"][0]["pnl_7d"] if q["pnl_7d"] else 0,
         "performance": q["performance"][0] if q["performance"] else None,
         "open_events": q["open_events"],
-        "agents": agent_health(q["activity"], now),
+        "agents": agent_health(q["activity"], q["pending"], now),
         "last_analyses": {r["agent_id"]: r for r in q["last_analyses"]},
         "analyses_count": {r["agent_id"]: r["n"] for r in q["analyses_count"]},
         "scoreboard": q["scoreboard"],

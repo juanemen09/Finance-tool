@@ -1,0 +1,135 @@
+/* Modo TV: una pantalla fija, sin desplazamiento, legible desde la cama. Las medidas van en vw/vh para que
+   se vea igual en una TV 1080p o 4K. */
+:root {
+  --navy-950: #040a1c;
+  --ink: #e8eeff;
+  --muted: #9aa8cf;
+  --line: rgba(130, 160, 255, 0.16);
+  --glass: rgba(9, 20, 52, 0.52);
+  --crimson: #dc143c;
+  --crimson-soft: #ff4d6d;
+  --ice: #6fd3ff;
+  --ok: #45e0b0;
+  --warn: #ffb547;
+  --radius: 1.1vw;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; overflow: hidden; }
+
+body {
+  background: radial-gradient(60vw 60vh at 15% 10%, #0f2460 0%, transparent 60%),
+              radial-gradient(50vw 50vh at 90% 90%, #3a0a24 0%, transparent 60%),
+              var(--navy-950);
+  color: var(--ink);
+  font: clamp(14px, 1.05vw, 40px)/1.35 "Segoe UI", system-ui, sans-serif;
+  cursor: none;
+}
+
+#lava {
+  position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0;
+  filter: blur(38px) saturate(1.35); opacity: 0.75; pointer-events: none;
+}
+
+.stage {
+  position: relative; z-index: 1; height: 100vh;
+  display: grid; grid-template-rows: auto 1fr auto; gap: 1.2vh;
+  padding: 1.6vh 1.4vw;
+  transition: transform 2s ease, filter 3s ease;
+}
+
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  backdrop-filter: blur(16px) saturate(1.2);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+  padding: 1.4vh 1.2vw;
+  min-height: 0;
+}
+
+h2 { margin: 0 0 1vh; font-size: 0.95em; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.k { display: block; font-size: 0.8em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.sub { color: var(--muted); font-size: 0.9em; }
+.up { color: var(--ok); }
+.down { color: var(--crimson-soft); }
+
+/* Franja superior */
+.strip { display: grid; grid-template-columns: auto auto 1fr auto; gap: 2.4vw; align-items: center; }
+.metric { display: flex; flex-direction: column; min-width: 0; }
+.metric b { font-size: 2.6em; font-weight: 700; line-height: 1.05; }
+.metric b small { font-size: 0.4em; color: var(--muted); margin-left: 0.3em; }
+.autopilot { display: flex; align-items: center; gap: 0.8vw; font-weight: 700; letter-spacing: 0.08em; font-size: 1.1em; }
+.autopilot i { width: 1.4vw; height: 1.4vw; border-radius: 50%; background: var(--muted); }
+.autopilot.on i { background: var(--ok); box-shadow: 0 0 1vw var(--ok); animation: breathe 3s ease-in-out infinite; }
+.autopilot.off i { background: var(--warn); }
+.clocks { display: flex; gap: 2vw; }
+.clocks b { font-size: 2em; font-variant-numeric: tabular-nums; }
+#countdown { color: var(--ice); }
+
+/* Centro */
+.tv-grid { display: grid; grid-template-columns: 1.75fr 1fr; gap: 1.2vw; min-height: 0; }
+.focus { display: grid; grid-template-rows: auto 1fr auto; min-height: 0; }
+.focus:not(.with-chart) { grid-template-rows: auto 1fr; }
+.tv-chart { min-height: 0; }
+.side { display: grid; grid-auto-rows: min-content; gap: 1.2vh; min-height: 0; overflow: hidden; }
+
+.radar { display: grid; gap: 1.6vh; align-content: center; }
+.focus:not(.with-chart) .radar { font-size: 1.3em; gap: 2.4vh; }
+.focus.with-chart .radar { gap: 0.6vh; font-size: 0.8em; margin-top: 1vh; }
+.radar-row { display: grid; grid-template-columns: 5.5em 1fr 8em 6em 7em; gap: 1vw; align-items: center; }
+.radar-row b { font-size: 1.5em; }
+.radar-row .price { font-variant-numeric: tabular-nums; font-size: 1.1em; }
+.radar-row .val { text-align: right; font-weight: 600; font-size: 1.15em; }
+.radar-row.muted { opacity: 0.45; }
+.track { height: 1.3vh; min-height: 8px; border-radius: 1vh; background: rgba(130, 160, 255, 0.12); overflow: hidden; }
+.track span { display: block; height: 100%; border-radius: 1vh; background: linear-gradient(90deg, #22408f, var(--ice)); }
+.track.near span { background: linear-gradient(90deg, var(--crimson), var(--crimson-soft)); animation: breathe 1.6s ease-in-out infinite; }
+.radar-note { color: var(--muted); font-size: 0.85em; margin-top: 0.4vh; }
+
+/* Veto */
+.veto .count { font-size: 5.5em; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: var(--crimson-soft); }
+.veto.live { border-color: var(--crimson); animation: alarm 1s steps(2, start) infinite; }
+.veto code { display: inline-block; margin-top: 0.8vh; padding: 0.4vh 0.6vw; border-radius: 0.5vw; background: rgba(220, 20, 60, 0.18); font-size: 1.15em; }
+.veto .title { font-size: 1.5em; font-weight: 700; }
+.badge { display: inline-block; padding: 0.2vh 0.6vw; border-radius: 1vw; border: 1px solid var(--line); font-size: 0.8em; letter-spacing: 0.06em; }
+
+/* Salud */
+.health { display: grid; gap: 1vh; }
+.agent { display: grid; grid-template-columns: auto 1fr; gap: 0.2vh 0.8vw; align-items: center; }
+.agent i { grid-row: span 2; width: 1.6vw; height: 1.6vw; border-radius: 50%; background: var(--ok); box-shadow: 0 0 1vw var(--ok); }
+.agent.bad i { background: var(--crimson); box-shadow: 0 0 1.2vw var(--crimson); animation: breathe 1.2s ease-in-out infinite; }
+.agent b { font-size: 1.3em; }
+.agent.bad .sub { color: var(--crimson-soft); }
+
+.alerts .alert { border-left: 0.3vw solid var(--warn); padding-left: 0.6vw; margin-bottom: 0.8vh; }
+.alerts .alert.critical { border-color: var(--crimson); }
+
+.offline {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 5; padding: 1.2vh; text-align: center;
+  background: var(--crimson); font-weight: 700; font-size: 1.3em; letter-spacing: 0.05em;
+}
+
+/* Abajo */
+.bottom { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 1.4vw; align-items: center; padding: 1vh 1.2vw; }
+.thesis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thesis .k { display: inline; margin-right: 0.6em; }
+.ticker { overflow: hidden; white-space: nowrap; mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); }
+.ticker-track { display: inline-block; padding-left: 100%; animation: scroll linear infinite; animation-duration: 240s; }
+.ticker-track span { margin-right: 3em; }
+.ticker-track em { color: var(--ice); font-style: normal; margin-right: 0.5em; }
+
+/* Noche: menos brillo y sin lava. La cinta sigue corriendo: lo que marca una pantalla es lo que no se mueve. */
+body.night .stage { filter: brightness(0.42) saturate(0.8); }
+body.night #lava { display: none; }
+body.night .veto.live { filter: brightness(2.2); }
+
+@keyframes breathe { 50% { opacity: 0.55; } }
+@keyframes alarm { 50% { box-shadow: 0 0 3vw var(--crimson); } }
+@keyframes scroll { to { transform: translateX(-100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track, .autopilot.on i, .track.near span, .agent.bad i, .veto.live { animation: none; }
+}

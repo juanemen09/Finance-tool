@@ -13,8 +13,10 @@ from ai_trading_lab.sentiment_history import STABLECOIN_URL, growth_series, pars
 from ai_trading_lab.strategies import rolling_max, rolling_min
 
 UNIVERSE = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "ONDOUSDT")
+CHANNEL_SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT")  # S-CHANNEL-1D no opera ONDO
 INTERVALS = ("1h", "4h", "1d")
 CACHE_SECONDS = 60
+RADAR_SECONDS = 30
 # S-CHANNEL-1D: entra si el cierre supera el máximo de 20 días; sale si pierde el mínimo de 10.
 ENTRY_LOOKBACK, EXIT_LOOKBACK = 20, 10
 
@@ -61,6 +63,43 @@ class CandleCache:
         with self._lock:
             self._cache[key] = (time.monotonic(), payload)
         return payload
+
+
+def radar_row(symbol, candles, now_ms=None):
+    """Precio en vivo frente a los niveles que decidirán en el próximo cierre diario: la compra si el cierre supera
+    el máximo de las 20 velas cerradas y la salida si pierde el mínimo de las 10."""
+    closed = closed_only(candles, now_ms)
+    if len(closed) < ENTRY_LOOKBACK or not candles:
+        raise MarketError(f"{symbol}: faltan velas diarias para el canal")
+    price = candles[-1].close  # la vela en formación: su cierre provisional es el precio actual
+    entry = max(c.high for c in closed[-ENTRY_LOOKBACK:])
+    exit_ = min(c.low for c in closed[-EXIT_LOOKBACK:])
+    return {"symbol": symbol, "price": price, "last_close": closed[-1].close, "entry_level": entry,
+            "exit_level": exit_, "gap_to_entry": entry / price - 1, "in_strategy": symbol in CHANNEL_SYMBOLS}
+
+
+class RadarCache:
+    def __init__(self, fetch=fetch_klines):
+        self._fetch, self._refresh, self._at, self._value = fetch, threading.Lock(), 0.0, None
+
+    def get(self):
+        if self._value is not None and time.monotonic() - self._at <= RADAR_SECONDS:
+            return self._value
+        # Un solo hilo consulta a Binance; si tarda, los demás reciben el radar anterior en vez de quedar en cola.
+        if not self._refresh.acquire(blocking=self._value is None):
+            return self._value
+        try:
+            if self._value is None or time.monotonic() - self._at > RADAR_SECONDS:
+                rows = []
+                for s in UNIVERSE:
+                    try:
+                        rows.append(radar_row(s, self._fetch(s, "1d", limit=ENTRY_LOOKBACK + 5)))
+                    except Exception as error:  # un par caído no apaga el radar de los demás
+                        rows.append({"symbol": s, "error": type(error).__name__, "in_strategy": s in CHANNEL_SYMBOLS})
+                self._value, self._at = {"rows": rows}, time.monotonic()
+            return self._value
+        finally:
+            self._refresh.release()
 
 
 def liquidity_payload(series, days=365):

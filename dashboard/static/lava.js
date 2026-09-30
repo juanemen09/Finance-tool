@@ -50,7 +50,8 @@
 
   let start = performance.now();
   function frame(now) {
-    if (!document.hidden) draw((now - start) / 1000);
+    // De noche el modo TV oculta la lava: no se dibuja para no gastar CPU.
+    if (!document.hidden && !document.body.classList.contains("night")) draw((now - start) / 1000);
     requestAnimationFrame(frame);
   }
 

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Modo TV · AI Trading Lab</title>
+  <link rel="stylesheet" href="/static/tv.css">
+</head>
+<body>
+  <canvas id="lava" aria-hidden="true"></canvas>
+  <div class="stage" id="stage">
+    <div class="offline" id="offline" hidden></div>
+
+    <header class="strip glass">
+      <div id="autopilot" class="autopilot"></div>
+      <div class="metric">
+        <span class="k">Saldo</span>
+        <b id="balance">—</b>
+        <span class="sub" id="balance-sub"></span>
+      </div>
+      <div class="metric" id="position"></div>
+      <div class="clocks">
+        <div><span class="k">Quito</span><b id="clock-quito">--:--</b></div>
+        <div><span class="k">UTC</span><b id="clock-utc">--:--</b></div>
+        <div><span class="k">Cierre diario en</span><b id="countdown">--:--:--</b></div>
+      </div>
+    </header>
+
+    <main class="tv-grid">
+      <section class="glass focus">
+        <h2 id="focus-title">Radar S-CHANNEL-1D</h2>
+        <div id="chart" class="tv-chart" hidden></div>
+        <div id="radar" class="radar"></div>
+      </section>
+      <aside class="side">
+        <section class="glass veto" id="veto"></section>
+        <section class="glass">
+          <h2>Agentes</h2>
+          <div id="health" class="health"></div>
+        </section>
+        <section class="glass alerts" id="alerts" hidden></section>
+      </aside>
+    </main>
+
+    <footer class="glass bottom">
+      <div class="thesis" id="thesis"></div>
+      <div class="ticker"><div class="ticker-track" id="ticker"></div></div>
+    </footer>
+  </div>
+  <script src="/static/vendor/lightweight-charts.js"></script>
+  <script src="/static/lava.js"></script>
+  <script src="/static/tv.js"></script>
+</body>
+</html>
