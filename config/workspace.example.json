@@ -1,0 +1,15 @@
+{
+  "_nota": "Copia este archivo como config/workspace.local.json (fuera de git) y pon tus rutas. Lo lee el modo TV.",
+  "money_engine": "C:/ruta/a/money-engine",
+  "projects": [
+    {"name": "AI Trading Lab", "role": "Trading spot con Claude y Codex", "path": "C:/ruta/a/ai-trading-lab"},
+    {"name": "Otro proyecto", "role": "Qué hace", "path": "C:/ruta/al/proyecto"}
+  ],
+  "zyneath": {
+    "stage": "Fase actual en una frase",
+    "price_usd_month": 300,
+    "target_annual_usd": 1000000,
+    "market_clinics": 500,
+    "active_clinics": null
+  }
+}

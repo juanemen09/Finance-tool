@@ -7,11 +7,16 @@
   <link rel="stylesheet" href="/static/tv.css">
 </head>
 <body>
-  <canvas id="lava" aria-hidden="true"></canvas>
+  <canvas id="space" aria-hidden="true"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
   <div class="stage" id="stage">
     <div class="offline" id="offline" hidden></div>
 
-    <header class="strip glass">
+    <header class="hud glass">
+      <div class="brand">
+        <span class="core-dot" aria-hidden="true"></span>
+        <div><b>AI TRADING LAB</b><span class="sub">centro de mando</span></div>
+      </div>
       <div id="autopilot" class="autopilot"></div>
       <div class="metric">
         <span class="k">Saldo</span>
@@ -26,19 +31,23 @@
       </div>
     </header>
 
-    <main class="tv-grid">
-      <section class="glass focus">
-        <h2 id="focus-title">Radar S-CHANNEL-1D</h2>
-        <div id="chart" class="tv-chart" hidden></div>
-        <div id="radar" class="radar"></div>
+    <main class="deck">
+      <section class="theater">
+        <nav class="tabs" id="tabs" aria-label="Secciones"></nav>
+        <div class="cube">
+          <article class="face glass" id="face" aria-live="polite"></article>
+        </div>
       </section>
-      <aside class="side">
+      <aside class="rail">
         <section class="glass veto" id="veto"></section>
         <section class="glass">
           <h2>Agentes</h2>
           <div id="health" class="health"></div>
         </section>
-        <section class="glass alerts" id="alerts" hidden></section>
+        <section class="glass feed-card">
+          <h2>En vivo <span class="live-dot" aria-hidden="true"></span></h2>
+          <ol id="feed" class="feed"></ol>
+        </section>
       </aside>
     </main>
 
@@ -48,7 +57,7 @@
     </footer>
   </div>
   <script src="/static/vendor/lightweight-charts.js"></script>
-  <script src="/static/lava.js"></script>
+  <script src="/static/tv3d.js"></script>
   <script src="/static/tv.js"></script>
 </body>
 </html>

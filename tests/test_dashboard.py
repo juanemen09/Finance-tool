@@ -218,7 +218,7 @@ class ServerTest(unittest.TestCase):
             self.assertEqual(status, 404, path)
 
     def test_tv_page_and_assets(self):
-        for path, marker in [("/tv", b"/static/tv.js"), ("/static/tv.js", b"wakeLock"), ("/static/tv.css", b".veto")]:
+        for path, marker in [("/tv", b"/static/tv.js"), ("/static/tv.js", b"wakeLock"), ("/static/tv.css", b".veto"), ("/static/tv3d.js", b"TV3D")]:
             status, headers, body = self.get(path)
             self.assertEqual(status, 200, path)
             self.assertIn(marker, body, path)

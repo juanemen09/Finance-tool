@@ -20,6 +20,7 @@ FILES = {
     "/static/app.js": "app.js",
     "/static/tv.css": "tv.css",
     "/static/tv.js": "tv.js",
+    "/static/tv3d.js": "tv3d.js",
     "/static/lava.js": "lava.js",
     "/static/vendor/lightweight-charts.js": "vendor/lightweight-charts.standalone.production.js",
 }
@@ -28,7 +29,8 @@ CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' 
 log = logging.getLogger("dashboard")
 
 
-def make_handler(state_provider, candles_provider, allowed_hosts, liquidity_provider=None, radar_provider=None):
+def make_handler(state_provider, candles_provider, allowed_hosts, liquidity_provider=None, radar_provider=None,
+                 workspace_provider=None):
     class Handler(BaseHTTPRequestHandler):
         server_version = "ai-trading-lab"
         sys_version = ""
@@ -63,6 +65,8 @@ def make_handler(state_provider, candles_provider, allowed_hosts, liquidity_prov
                     return self._json(200, liquidity_provider())
                 if url.path == "/api/radar" and radar_provider:
                     return self._json(200, radar_provider())
+                if url.path == "/api/workspace" and workspace_provider:
+                    return self._json(200, workspace_provider())
                 if url.path == "/api/candles":
                     params = parse_qs(url.query)
                     symbol = params.get("symbol", [""])[0]
@@ -102,10 +106,11 @@ class LocalServer(ThreadingHTTPServer):
         super().server_bind()
 
 
-def make_server(port, state_provider, candles_provider, liquidity_provider=None, radar_provider=None):
+def make_server(port, state_provider, candles_provider, liquidity_provider=None, radar_provider=None,
+                workspace_provider=None):
     server = LocalServer(("127.0.0.1", port), None)
     real_port = server.server_address[1]
     allowed = {f"127.0.0.1:{real_port}", f"localhost:{real_port}"}
     server.RequestHandlerClass = make_handler(state_provider, candles_provider, allowed, liquidity_provider,
-                                              radar_provider)
+                                              radar_provider, workspace_provider)
     return server
