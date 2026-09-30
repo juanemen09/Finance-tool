@@ -19,6 +19,10 @@ ejecutará sola tras la ventana de veto, o es una venta o reducción que convien
 
 Un correo por decisión: no mezcles dos propuestas en el mismo hilo.
 
+Si la propuesta es `auto_ok`, el correo dice a qué hora se ejecutará sola si el usuario no responde. **No responder es
+aprobar** (decisión del usuario, evento 34): a cualquier hora del día, Codex la ejecuta al pasar la ventana de veto. Si
+no es `auto_ok`, el correo dice qué límite incumple y que solo se ejecutará con su `AUTORIZO`.
+
 ## 2. Leer las respuestas
 
 1. `search_threads` con `subject:DECISIÓN newer_than:2d` (vista mínima). Solo interesan los hilos con más de un mensaje.

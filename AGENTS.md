@@ -221,6 +221,12 @@ devuelve `auto_ok = true`, es decir, si se cumplen TODAS estas condiciones:
 - pérdidas cerradas de los últimos 7 días > -1 USDT;
 - ninguna alerta `permissions_review` abierta (permisos del ejecutor corregidos) y ninguna posición abierta.
 
+**El silencio del usuario es consentimiento** (decisión del usuario, 2026-09-30, evento 34). Si pasa la ventana de veto
+sin respuesta suya, ni por chat ni por correo, la propuesta se ejecuta sin esperarlo, **a cualquier hora del día**,
+comprando o vendiendo. Ningún agente debe pedirle confirmación adicional ni frenar una propuesta `auto_ok` porque sea de
+noche o porque él no contestó. Lo único que sigue bloqueado es lo que incumple alguno de sus límites (`auto_ok = false`):
+ejecutarlo violaría sus propios parámetros, así que solo sale con su «autorizo».
+
 `v_executable_proposals.authorization_mode` dice si la autorización fue del usuario (`USER`) o permanente
 (`STANDING`). **Veto:** si el usuario escribe a cualquier agente "veto <proposal_id>", ese agente inserta en
 `user_vetoes` citando el mensaje, inmediatamente. Cuando un agente aprueba una propuesta, el correo al usuario
