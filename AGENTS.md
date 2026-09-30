@@ -189,6 +189,19 @@ siguiente:
   compara con el mes anterior.
 - Es investigación: no respalda operaciones, no pasa por el hard testing y el 13F llega hasta 45 días tarde.
 
+## Pronósticos de TimesFM 3.0 (papel, desde 2026-09-30)
+
+Detalle y criterio pre-registrado en `docs/plans/tsfm-forward-test.md`. Investigación personal y no comercial.
+
+- **Cuándo corre.** Una tarea de Windows (`tools/tsfm_daily.cmd`) pronostica cada día, a las 00:10 UTC, el cierre
+  diario de los 5 pares a 1, 3 y 7 días. Da los cuantiles p10 a p90 y guarda al lado la referencia de un paseo
+  aleatorio. Al vencer, cada pronóstico se puntúa frente al precio real.
+- **Dónde está.** Tablas `forecasts` y `forecast_outcomes`; vistas `v_forecast_latest` y `v_forecast_skill`.
+- **Qué es.** Contexto, no señal: el análisis de Claude cita el pronóstico del activo, pero nadie propone, aprueba,
+  rechaza ni dimensiona una operación por él. Solo si pasa la prueba hacia delante (60 cierres, hacia el
+  2026-12-06) se pre-registra un filtro para S-CHANNEL-1D, que irá en papel.
+- **Por qué no hay backtest.** El modelo casi seguro vio el historial de estos precios al entrenarse.
+
 ## Autorización permanente con ventana de veto
 
 Aplicada por el usuario el 2026-09-24 (`standing_authorizations`, fila vigente = la última). Una propuesta

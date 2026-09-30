@@ -46,6 +46,11 @@ SQL = {
            "order by observed_at desc limit 60",
     "research": "select source, title, url, own_summary, created_at from strategy_sources order by id desc limit 8",
     "ai_thesis": "select kind, as_of, title, body, data, created_at from v_research_latest",
+    "forecast_latest": "select symbol, horizon_days, median_return, quantiles, last_close, origin_close_time "
+                       "from v_forecast_latest where model = 'timesfm-3.0' order by symbol, horizon_days",
+    "forecast_skill": "select horizon_days, scored, direction_hit_rate, coverage_p10_p90, skill_vs_random_walk, since "
+                      "from v_forecast_skill where model = 'timesfm-3.0' and symbol is null and horizon_days is not null "
+                      "order by horizon_days",
     "equity": "select observed_at, balances from portfolio_snapshots order by observed_at limit 2000",
     "timeline": "select * from ("
                 " select created_at as at, 'analysis' as kind, agent_id as agent, coalesce(proposed_action, '') as title,"
@@ -136,6 +141,7 @@ def build_state(run_query, now):
         "news": q["news"],
         "research": q["research"],
         "ai_thesis": {r["kind"]: r for r in q["ai_thesis"]},
+        "forecast": {"latest": q["forecast_latest"], "skill": q["forecast_skill"]},
         "themes": q["themes"],
         "rwa": q["rwa"],
         "equity": equity_curve(q["equity"]),

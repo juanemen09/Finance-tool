@@ -374,6 +374,31 @@
     } else empty("ai-bottleneck", "El informe mensual de cuello de botella aún no se ha escrito.");
   }
 
+  // ---------------------------------------------------------------- pronóstico TimesFM (papel)
+  function renderForecast() {
+    const f = state.forecast || { latest: [], skill: [] };
+    if (!f.latest.length) { fill("forecast", h("p", { class: "empty", text: "Aún no hay pronósticos (la tarea diaria corre a las 19:10 de Quito)." })); return; }
+    const bySymbol = {};
+    for (const r of f.latest) (bySymbol[r.symbol] ||= {})[r.horizon_days] = r;
+    const rel = (r, k) => r ? (Number(r.quantiles[k]) / Number(r.last_close) - 1) * 100 : null;
+    const cell = (r) => r ? `${signed(rel(r, "p50"))} (${num(rel(r, "p10"), 1)} a ${num(rel(r, "p90"), 1)})` : "—";
+    const rows = Object.entries(bySymbol).map(([s, hs]) => h("tr", {},
+      h("td", { text: s.replace("USDT", "") }), h("td", { text: num(hs[1]?.last_close, 4) }),
+      h("td", { class: toneOf(rel(hs[1], "p50")), text: cell(hs[1]) }),
+      h("td", { class: toneOf(rel(hs[3], "p50")), text: cell(hs[3]) }),
+      h("td", { class: toneOf(rel(hs[7], "p50")), text: cell(hs[7]) })));
+    const origin = f.latest[0]?.origin_close_time;
+    const skill = f.skill.length
+      ? f.skill.map((s) => `${s.horizon_days} d: ${s.scored} puntuados · dirección ${pct(s.direction_hit_rate, 0)} · banda ${pct(s.coverage_p10_p90, 0)} · skill vs paseo aleatorio ${s.skill_vs_random_walk === null ? "—" : num(s.skill_vs_random_walk * 100, 1) + " %"}`).join("   |   ")
+      : "Todavía ningún pronóstico ha vencido: el primero a 1 día se puntúa mañana.";
+    fill("forecast",
+      h("table", { class: "ai-table" },
+        h("tr", {}, h("th", { text: "" }), h("th", { text: "Cierre" }), h("th", { text: "1 día · mediana (p10 a p90)" }),
+          h("th", { text: "3 días" }), h("th", { text: "7 días" })), rows),
+      h("p", { class: "sub", text: `Desde el cierre del ${origin ? origin.slice(0, 10) : "—"}. ${skill}` }),
+      h("p", { class: "sub", text: "Criterio pre-registrado: a los 60 cierres (≈ 6 dic), skill > 0 con IC 95 %, dirección > 55 % y banda 70-90 %. Hasta entonces es contexto." }));
+  }
+
   const THEME_NAMES = { tokenizacion: "tokenización", materias_primas: "materias primas" };
   let liqChart = null, liqSeries = null;
 
@@ -491,7 +516,7 @@
   async function refresh() {
     try {
       state = await getJSON("/api/state");
-      for (const fn of [renderStatus, renderAlerts, renderAccount, renderDuel, renderProposal, renderTimeline, renderStrategies, renderSentiment, renderNews, renderResearch, renderThemes, renderAiThesis]) {
+      for (const fn of [renderStatus, renderAlerts, renderAccount, renderDuel, renderProposal, renderTimeline, renderStrategies, renderSentiment, renderNews, renderResearch, renderThemes, renderAiThesis, renderForecast]) {
         try { fn(); } catch (e) { console.error(fn.name, e); }
       }
       $("updated").textContent = `Actualizado ${quitoFmt.format(new Date())} (Quito) · se refresca cada 30 s`;

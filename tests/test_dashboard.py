@@ -83,6 +83,7 @@ class ShapingTest(unittest.TestCase):
             self.assertIn(key, state)
         self.assertNotIn("postgresql://", json.dumps(state))
         self.assertEqual(list(state["ai_thesis"]), ["13F_BOOK"], "la tesis IA llega indexada por tipo de informe")
+        self.assertEqual(state["forecast"], {"latest": [], "skill": []}, "sin pronósticos, el panel recibe listas vacías")
 
 
 class MarketTest(unittest.TestCase):
