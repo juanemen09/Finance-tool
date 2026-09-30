@@ -159,7 +159,7 @@
     hub: "255,77,109", agent: "69,224,176", alert: "255,77,109", market: "111,211,255", asset: "111,211,255",
     hot: "255,181,71", strategy: "170,140,255", rejected: "120,110,160", research: "255,214,110", forecast: "120,230,255",
     sentiment: "210,160,255", project: "90,150,255", person: "235,240,255", money: "80,230,140", zyneath: "255,130,200",
-    rules: "255,181,71", proposal: "255,77,109",
+    rules: "255,181,71", proposal: "255,77,109", pending: "255,159,67",
   };
   const graph = { nodes: [], links: [], byId: new Map(), alpha: 1, hover: null, selected: null, onSelect: null };
   const gcam = { yaw: 0.4, pitch: 0.35, dist: 22, dragging: false, lastX: 0, lastY: 0, idleAt: 0, targetYaw: null };
@@ -275,7 +275,7 @@
       const p = n._p, rgb = GROUP_RGB[n.group] || "200,210,255";
       const dim = lit && !lit.has(n.id);
       const r = Math.max(4 * DPR, p.s * 0.13 * (n.size || 1));
-      const breathe = n.group === "alert" || n.group === "hot" || n.group === "proposal" ? 1 + 0.15 * Math.sin(t * 5) : 1;
+      const breathe = n.group === "alert" || n.group === "hot" || n.group === "proposal" || n.group === "pending" ? 1 + 0.15 * Math.sin(t * 5) : 1;
       glow(p, r * 3.2 * breathe, rgb, dim ? 0.12 : 0.4);
       ctx.fillStyle = `rgba(${rgb},${dim ? 0.4 : 0.95})`;
       ctx.beginPath();

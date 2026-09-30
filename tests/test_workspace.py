@@ -32,6 +32,45 @@ class GitTest(unittest.TestCase):
         self.assertEqual(out, {"error": "sin commits"})
 
 
+class TeamTest(unittest.TestCase):
+    def test_github_slug(self):
+        from dashboard.workspace import github_slug
+        self.assertEqual(github_slug("https://github.com/juanemen09/Finance-tool.git"), "juanemen09/Finance-tool")
+        self.assertEqual(github_slug("git@github.com:ana/repo.git"), "ana/repo")
+        self.assertIsNone(github_slug("https://gitlab.com/x/y.git"))
+
+    def test_pending_orders_by_urgency_and_names_who(self):
+        from dashboard.workspace import team_pending
+        projects = [{"name": "Lab", "repo": {"github": "a/b", "uncommitted": 2, "ahead": 1, "behind": 0,
+                                             "unmerged_branches": [{"branch": "feat-x", "author": "Ana", "at": "2026-09-29T00:00:00Z"}]},
+                     "github_items": {"pulls": [{"number": 7, "title": "Nueva vista", "author": "ana", "draft": False, "reviewers": [], "created_at": "2026-09-28T00:00:00Z"}],
+                                      "issues": [{"number": 3, "title": "Bug", "author": "x", "assignees": [], "created_at": "2026-09-27T00:00:00Z"}]}},
+                    {"name": "Sin remoto", "repo": {"github": None, "uncommitted": 0}}]
+        items = team_pending(projects)
+        texts = [i["text"] for i in items]
+        self.assertEqual(items[0]["level"], 3)
+        self.assertIn("1 commit(s) sin push en None", texts)
+        self.assertIn("rama feat-x sin fusionar", texts)
+        self.assertTrue(any("PR #7" in t for t in texts))
+        self.assertTrue(any(i["who"] == "sin asignar" for i in items))
+        self.assertTrue(any("sin remoto" in t for t in texts))
+
+    def test_repo_status_reads_git(self):
+        from dashboard.workspace import repo_status
+        answers = {"remote": "https://github.com/a/b.git", "rev-parse": "main", "status": " M x.py\n?? y.py\n",
+                   "rev-list": "2\t1", "symbolic-ref": "origin/main", "for-each-ref": "origin/main\tA\t2026\norigin/feat\tAna\t2026-09-29T00:00:00Z\n"}
+
+        def run(cmd, **kwargs):
+            sub = cmd[3]
+            if sub == "merge-base":
+                return subprocess.CompletedProcess(cmd, 1, "", "")  # la rama no está fusionada
+            return subprocess.CompletedProcess(cmd, 0, answers.get(sub, ""), "")
+        out = repo_status("repo", fetch=False, run=run)
+        self.assertEqual((out["uncommitted"], out["behind"], out["ahead"]), (2, 2, 1))
+        self.assertEqual(out["github"], "a/b")
+        self.assertEqual(out["unmerged_branches"], [{"branch": "feat", "author": "Ana", "at": "2026-09-29T00:00:00Z"}])
+
+
 class MoneyTest(unittest.TestCase):
     def test_reads_posts_config_and_pause(self):
         with tempfile.TemporaryDirectory() as tmp:

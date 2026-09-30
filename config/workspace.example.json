@@ -1,9 +1,12 @@
 {
   "_nota": "Copia este archivo como config/workspace.local.json (fuera de git) y pon tus rutas. Lo lee el modo TV.",
+  "github_owner": "tu-usuario-de-github",
+  "obsidian_vault": "C:/ruta/a/tu/boveda",
   "money_engine": "C:/ruta/a/money-engine",
   "projects": [
     {"name": "AI Trading Lab", "role": "Trading spot con Claude y Codex", "path": "C:/ruta/a/ai-trading-lab"},
-    {"name": "Otro proyecto", "role": "Qué hace", "path": "C:/ruta/al/proyecto"}
+    {"name": "Otro proyecto", "role": "Qué hace", "path": "C:/ruta/al/proyecto"},
+    {"name": "Clon ajeno", "role": "No se sigue su avance", "path": "C:/ruta/al/clon", "track": false}
   ],
   "zyneath": {
     "stage": "Fase actual en una frase",

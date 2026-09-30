@@ -321,11 +321,29 @@
   }
 
   function secTeam() {
-    const projects = workspace?.projects || [];
+    const projects = (workspace?.projects || []).filter((p) => p.repo);
+    const pending = workspace?.pending || [];
+    const byWho = {};
+    for (const it of pending) (byWho[it.who] ||= []).push(it);
+    const level = (n) => n === 3 ? ["urgente", "bad"] : n === 2 ? ["pendiente", "mid"] : ["aviso", ""];
+    const cell = (v, warnAt) => h("td", { class: `num ${v && v >= warnAt ? "warn" : ""}`, text: v === null || v === undefined ? "—" : String(v) });
+    const team = state.team || [];
     return {
-      title: "Equipo y avances", sub: "commits de los últimos 7 días en cada proyecto",
-      body: [h("div", { class: "grid-3 stagger" }, projects.length ? projects.map(projectCard) : [empty(workspace?.configured === false ? "Falta config/workspace.local.json." : "Cargando…")]),
-        h("p", { class: "sub", text: "Módulo de equipo: la migración de miembros aún no está aplicada en Supabase, así que no hay personas registradas." })],
+      title: "Equipo · pendientes y avances", sub: "quién debe hacer commit, push, pull o fusionar",
+      body: [
+        h("div", { class: "tile" }, h("table", { class: "t" },
+          h("tr", {}, ["Proyecto", "Sin commit", "Sin push", "Por traer", "Ramas sin fusionar", "PR abiertos", "Issues", "Commits 7 d"]
+            .map((x, i) => h("th", { class: i ? "num" : "", text: x }))),
+          projects.map((p) => h("tr", {}, h("td", { text: p.name }), cell(p.repo.uncommitted, 1), cell(p.repo.ahead, 1), cell(p.repo.behind, 1),
+            cell((p.repo.unmerged_branches || []).length, 1), cell(p.github_items?.pulls?.length, 1), cell(p.github_items?.issues?.length, 1),
+            cell(p.commits_7d, 999))))),
+        h("div", { class: "grid-3 stagger" }, Object.keys(byWho).length ? Object.entries(byWho).map(([who, items]) => h("div", { class: "tile" },
+          h("h3", { text: who }),
+          h("ul", { class: "list" }, items.slice(0, 6).map((it) => {
+            const [label, kind] = level(it.level);
+            return h("li", {}, badge(label, kind), h("span", { class: "clamp", text: `${it.project}: ${it.text}` }), h("span", { class: "sub", text: it.at ? ago(it.at) : "" }));
+          })))) : [empty("Nada pendiente: commits, push y fusiones al día.")]),
+        h("p", { class: "sub", text: `${team.length ? `${team.length} miembro(s) registrados. ` : "Aún no hay miembros registrados (python -m team). "}Lo que está sin commit o sin push solo se ve en esta PC; de los demás se ve lo que ya subieron: ramas, PR e issues.` })],
     };
   }
 
@@ -542,12 +560,12 @@
     hub: "Centro", agent: "Agente al día", alert: "Alerta o agente atrasado", market: "Mercado", asset: "Activo",
     hot: "Activo cerca de la compra", strategy: "Estrategia", rejected: "Estrategias rechazadas", research: "Investigación",
     forecast: "Pronóstico", sentiment: "Sentimiento", project: "Proyecto", person: "Persona", money: "Money Printer",
-    zyneath: "Zyneath", rules: "Reglas de riesgo", proposal: "Propuesta o posición",
+    zyneath: "Zyneath", rules: "Reglas de riesgo", proposal: "Propuesta o posición", pending: "Pendiente del equipo",
   };
   const GROUP_COLORS = {
     hub: "#ff4d6d", agent: "#45e0b0", alert: "#ff4d6d", market: "#6fd3ff", asset: "#6fd3ff", hot: "#ffb547",
     strategy: "#aa8cff", rejected: "#786ea0", research: "#ffd66e", forecast: "#78e6ff", sentiment: "#d2a0ff",
-    project: "#5a96ff", person: "#ebf0ff", money: "#50e68c", zyneath: "#ff82c8", rules: "#ffb547", proposal: "#ff4d6d",
+    project: "#5a96ff", person: "#ebf0ff", money: "#50e68c", zyneath: "#ff82c8", rules: "#ffb547", proposal: "#ff4d6d", pending: "#ff9f43",
   };
   let graphOn = false, graphTourAt = 0, graphTourIdx = 0, graphNodes = new Map();
 
@@ -658,6 +676,14 @@
         link(pid, id, `${n} commit(s)`, 0.5);
       }
     }
+    (workspace?.pending || []).slice(0, 14).forEach((it, i) => {
+      const id = `pd:${i}`;
+      add(id, it.text.length > 30 ? `${it.text.slice(0, 28)}…` : it.text, "pending", it.level === 3 ? 0.9 : 0.7, [it.project, it.text, `Responsable: ${it.who}`]);
+      if (graphNodes.has(`pj:${it.project}`)) link(id, `pj:${it.project}`, "pendiente en", 0.6);
+      const person = /juan emilio/i.test(it.who) ? "founder" : it.who === "Claude" ? "ag:claude" : `pe:${it.who}`;
+      if (!graphNodes.has(person) && !/sin asignar/.test(it.who)) add(person, it.who, "person", 0.9, ["Colaborador"]);
+      if (graphNodes.has(person)) link(person, id, "debe", 0.4);
+    });
     const m = workspace?.money;
     if (m && !m.error) {
       add("money", "Money Printer", "money", 1.3, [m.paused ? "PAUSADO" : "Activo", m.video_engine_up ? "MoneyPrinterTurbo en línea" : "MoneyPrinterTurbo apagado",
