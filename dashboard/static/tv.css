@@ -61,7 +61,7 @@ h3 { margin: 0 0 0.6vh; font-size: 1.05em; font-weight: 650; }
 .empty { color: var(--faint); font-style: italic; }
 
 /* ------------------------------------------------------------ cabecera */
-.hud { display: grid; grid-template-columns: auto auto auto 1fr auto; gap: 2.2vw; align-items: center; }
+.hud { display: grid; gap: 2vw; align-items: center; }
 .brand { display: flex; align-items: center; gap: 0.8vw; }
 .brand b { display: block; letter-spacing: 0.3em; font-size: 1em; }
 .core-dot {
@@ -202,6 +202,45 @@ table.t td.num, table.t th.num { text-align: right; }
 .ticker-track { display: inline-block; padding-left: 100%; animation: scroll linear infinite; animation-duration: 240s; }
 .ticker-track span { margin-right: 3em; }
 .ticker-track em { color: var(--ice); font-style: normal; margin-right: 0.5em; }
+
+/* ------------------------------------------------------------ mapa 3D (grafo) */
+.hud { grid-template-columns: auto auto auto 1fr auto auto; }
+.graph-toggle {
+  font: inherit; font-weight: 650; letter-spacing: 0.06em; color: var(--ink); cursor: pointer;
+  padding: 0.7vh 1vw; border-radius: 2em; border: 1px solid rgba(255, 120, 150, 0.5);
+  background: linear-gradient(90deg, rgba(220, 20, 60, 0.35), rgba(60, 90, 220, 0.35));
+  transition: transform 0.4s var(--ease), box-shadow 0.4s;
+}
+.graph-toggle:hover { transform: translateY(-2px); box-shadow: 0 0 1.5vw rgba(255, 77, 109, 0.5); }
+body.graph .stage { opacity: 0; pointer-events: none; transform: scale(0.97); transition: opacity 0.8s var(--ease), transform 0.8s var(--ease); }
+body.graph .vignette { opacity: 0.5; }
+body.graph #space { cursor: grab; opacity: 1; }
+.graph-ui { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
+.graph-ui > * { pointer-events: auto; }
+.graph-bar { position: absolute; top: 1.6vh; left: 1.3vw; right: 1.3vw; display: flex; gap: 1.2vw; align-items: center; }
+.graph-bar b { display: block; letter-spacing: 0.2em; text-transform: uppercase; font-size: 0.95em; }
+.graph-bar button {
+  font: inherit; color: var(--ink); cursor: pointer; padding: 0.6vh 1vw; border-radius: 2em;
+  background: rgba(10, 20, 55, 0.7); border: 1px solid var(--line);
+}
+.graph-legend { position: absolute; left: 1.3vw; bottom: 1.6vh; display: grid; gap: 0.5vh; font-size: 0.85em; }
+.graph-legend span { display: flex; align-items: center; gap: 0.5vw; }
+.graph-legend i { width: 0.8em; height: 0.8em; border-radius: 50%; box-shadow: 0 0 0.6em currentColor; background: currentColor; }
+.graph-card {
+  position: absolute; right: 1.3vw; top: 12vh; width: min(30vw, 520px); max-height: 76vh; overflow: auto;
+  animation: rise 0.6s var(--ease) both;
+}
+.graph-card h3 { font-size: 1.4em; margin-bottom: 0.4vh; }
+.graph-card .kind { font-size: 0.78em; letter-spacing: 0.16em; text-transform: uppercase; }
+.graph-card ul { margin: 1vh 0 0; padding-left: 1.1em; display: grid; gap: 0.6vh; }
+.graph-card .links { margin-top: 1.2vh; display: flex; flex-wrap: wrap; gap: 0.3vw; }
+.graph-card .links button { font: inherit; font-size: 0.82em; cursor: pointer; color: var(--ink); background: rgba(111, 211, 255, 0.12); border: 1px solid var(--line); border-radius: 1em; padding: 0.2vh 0.6vw; }
+@media (max-width: 900px) {
+  body.graph { overflow: hidden; height: 100%; }
+  .graph-card { left: 12px; right: 12px; width: auto; top: auto; bottom: 12px; max-height: 45vh; }
+  .graph-legend { display: none; }
+  .hud { grid-template-columns: 1fr 1fr; }
+}
 
 /* noche: menos brillo; la escena baja a 30 cuadros por segundo (tv3d.js) */
 body.night .stage { filter: brightness(0.5) saturate(0.85); }

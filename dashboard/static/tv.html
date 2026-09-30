@@ -24,6 +24,7 @@
         <span class="sub" id="balance-sub"></span>
       </div>
       <div class="metric" id="position"></div>
+      <button class="graph-toggle" id="graph-toggle" type="button" title="Mapa 3D (tecla G)">◉ Mapa 3D</button>
       <div class="clocks">
         <div><span class="k">Quito</span><b id="clock-quito">--:--</b></div>
         <div><span class="k">UTC</span><b id="clock-utc">--:--</b></div>
@@ -55,6 +56,17 @@
       <div class="thesis" id="thesis"></div>
       <div class="ticker"><div class="ticker-track" id="ticker"></div></div>
     </footer>
+  </div>
+  <div class="graph-ui" id="graph-ui" hidden>
+    <div class="graph-bar glass">
+      <button type="button" id="graph-back">← Volver al panel (G)</button>
+      <div>
+        <b>Mapa del ecosistema</b>
+        <span class="sub">Cada punto es una pieza y cada línea, una relación real. Arrastra para girar, rueda para acercar, toca un punto.</span>
+      </div>
+    </div>
+    <div class="graph-legend glass" id="graph-legend"></div>
+    <aside class="graph-card glass" id="graph-card" hidden></aside>
   </div>
   <script src="/static/vendor/lightweight-charts.js"></script>
   <script src="/static/tv3d.js"></script>

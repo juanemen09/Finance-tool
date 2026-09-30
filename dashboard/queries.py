@@ -54,6 +54,8 @@ SQL = {
                       "from v_forecast_skill where model = 'timesfm-3.0' and symbol is null and horizon_days is not null "
                       "order by horizon_days",
     "equity": "select observed_at, balances from portfolio_snapshots order by observed_at limit 2000",
+    "team": "select member_id, display_name, active, role, steps_done, joined_at from v_team_roster "
+            "order by joined_at nulls last",
     "timeline": "select * from ("
                 " select created_at as at, 'analysis' as kind, agent_id as agent, coalesce(proposed_action, '') as title,"
                 "  left(coalesce(market_regime, ''), 240) as detail, analysis_id as ref from analyses"
@@ -133,6 +135,7 @@ def build_state(run_query, now):
         "themes": q["themes"],
         "rwa": q["rwa"],
         "equity": equity_curve(q["equity"]),
+        "team": q["team"],
         "timeline": q["timeline"],
     }
     return to_jsonable(state)

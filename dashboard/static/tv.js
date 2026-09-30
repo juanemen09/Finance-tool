@@ -375,7 +375,7 @@
   }
 
   function autoAdvance() {
-    if (Date.now() < pausedUntil) return;
+    if (graphOn || Date.now() < pausedUntil) return;
     if (Date.now() - sectionStarted >= SECTION_SECONDS * 1000) go(current + 1, false);
   }
 
@@ -503,7 +503,7 @@
     // una ventana de veto abierta o una posición nueva llevan la pantalla al mercado
     const p = activeProposal(), end = vetoEnd(p);
     const urgent = end !== null && Date.now() < end ? `veto:${p.proposal_id}` : state?.open_positions?.[0] ? `pos:${state.open_positions[0].trade_ref}` : "";
-    if (urgent && urgent !== lastForced) { lastForced = urgent; go(0, true); }
+    if (urgent && urgent !== lastForced) { lastForced = urgent; if (graphOn) setGraphMode(false); go(0, true); }
     const silent = (Date.now() - lastOk) / 1000;
     const banner = $("offline");
     banner.hidden = silent < OFFLINE_SECONDS;
@@ -526,7 +526,8 @@
       for (const fn of [renderTop, renderHealth, renderFeed, renderBottom, renderVeto, pushScene]) {
         try { fn(); } catch (e) { console.error(fn.name, e); }
       }
-      if (!$("face").firstChild) { paintFace(false); renderTabs(); } else paintFace(true);
+      if (!$("face").firstChild) { paintFace(false); renderTabs(); if (location.hash === "#mapa") setGraphMode(true); } else paintFace(true);
+      if (graphOn) refreshGraph();
     } catch (e) { console.error("estado", e); }
   }
   async function refreshRadar() {
@@ -536,8 +537,216 @@
     try { workspace = await getJSON("/api/workspace"); if (state && current >= 6) paintFace(true); } catch (e) { console.error("workspace", e); }
   }
 
+  // ---------------------------------------------------------------- mapa 3D: el ecosistema como grafo de conocimiento
+  const GROUP_NAMES = {
+    hub: "Centro", agent: "Agente al día", alert: "Alerta o agente atrasado", market: "Mercado", asset: "Activo",
+    hot: "Activo cerca de la compra", strategy: "Estrategia", rejected: "Estrategias rechazadas", research: "Investigación",
+    forecast: "Pronóstico", sentiment: "Sentimiento", project: "Proyecto", person: "Persona", money: "Money Printer",
+    zyneath: "Zyneath", rules: "Reglas de riesgo", proposal: "Propuesta o posición",
+  };
+  const GROUP_COLORS = {
+    hub: "#ff4d6d", agent: "#45e0b0", alert: "#ff4d6d", market: "#6fd3ff", asset: "#6fd3ff", hot: "#ffb547",
+    strategy: "#aa8cff", rejected: "#786ea0", research: "#ffd66e", forecast: "#78e6ff", sentiment: "#d2a0ff",
+    project: "#5a96ff", person: "#ebf0ff", money: "#50e68c", zyneath: "#ff82c8", rules: "#ffb547", proposal: "#ff4d6d",
+  };
+  let graphOn = false, graphTourAt = 0, graphTourIdx = 0, graphNodes = new Map();
+
+  function buildGraph() {
+    const nodes = [], links = [];
+    const add = (id, label, group, size, info) => { nodes.push({ id, label, group, size, info: info.filter(Boolean) }); graphNodes.set(id, nodes[nodes.length - 1]); };
+    const link = (a, b, rel, w) => links.push({ source: a, target: b, rel, w: w || 1 });
+    graphNodes = new Map();
+    const sa = state.standing_authorization || {};
+    const usdt = state.portfolio ? state.portfolio.balances.filter((b) => b.asset === "USDT").reduce((s, b) => s + Number(b.free) + Number(b.locked), 0) : null;
+
+    add("lab", "AI Trading Lab", "hub", 2.4, [`Saldo ${num(usdt, 2)} USDT`, `Piloto automático ${sa.active ? "encendido" : "apagado"}`, `${state.open_positions.length} posición(es) abierta(s)`]);
+    nodes[0].pinned = true;
+    add("founder", "Juan Emilio", "person", 1.6, ["Fundador: autoriza, veta y fija los límites", "Su silencio tras el veto es aprobación (evento 34)"]);
+    link("founder", "lab", "dirige", 1.5);
+    add("rules", "Reglas de riesgo", "rules", 1.1, [`Veto ${sa.veto_minutes ?? "—"} min`, `Pérdida máx. ${num(sa.max_loss_usdt, 2)} USDT por operación`,
+      `Riesgo/beneficio mín. ${num(sa.min_reward_risk, 1)}`, `Pérdida semanal máx. ${num(sa.weekly_loss_limit_usdt, 2)} USDT (llevas ${num(state.pnl_7d, 2)})`,
+      "Solo Spot · 5 pares · 7 USDT · 1 posición"]);
+    link("founder", "rules", "fija");
+    link("rules", "lab", "limita");
+
+    for (const a of state.agents) {
+      const la = state.last_analyses[a.agent_id];
+      add(`ag:${a.agent_id}`, AGENT_NAMES[a.agent_id], a.state === "ok" ? "agent" : "alert", 1.7, [
+        a.state === "ok" ? `Al día · última actividad ${ago(a.last_activity)}` : a.reason,
+        la ? `Último análisis: ${la.proposed_action} (ciclo ${la.cycle_id})` : null,
+        la?.market_regime ? la.market_regime.slice(0, 220) : null,
+        a.agent_id === "chatgpt" ? "Único ejecutor en Binance" : "Solo lectura en Binance: investiga, propone y revisa"]);
+      link(`ag:${a.agent_id}`, "lab", "trabaja en", 1.4);
+    }
+    link("ag:claude", "ag:chatgpt", "revisión cruzada", 0.8);
+
+    add("binance", "Binance Spot", "market", 1.4, [`${num(usdt, 2)} USDT`, state.portfolio ? `Verificado ${ago(state.portfolio.observed_at)}` : null]);
+    link("lab", "binance", "opera en", 1.3);
+    link("ag:chatgpt", "binance", "ejecuta", 0.6);
+    link("ag:claude", "binance", "lee", 0.4);
+    const f7 = forecastMap(7);
+    for (const r of (radar?.rows || []).filter((x) => !x.error)) {
+      const near = Math.max(0, Math.min(1, 1 - r.gap_to_entry / 0.15));
+      const f = f7[r.symbol];
+      add(`as:${r.symbol}`, r.symbol.replace("USDT", ""), r.in_strategy && r.gap_to_entry < 0.02 ? "hot" : "asset", 0.8 + near * 0.9, [
+        `Precio ${num(r.price, r.price < 10 ? 4 : 2)} USDT`, r.gap_to_entry <= 0 ? "Por encima del máximo de 20 días: se decide al cierre" : `A ${num(r.gap_to_entry * 100, 1)} % de la compra (máx. 20 días ${num(r.entry_level, 4)})`,
+        `Salida si cierra bajo ${num(r.exit_level, 4)}`, f ? `TimesFM 7 d: mediana ${signed(f.median_return * 100)} %` : null,
+        r.in_strategy ? "Lo opera S-CHANNEL-1D" : "Fuera de S-CHANNEL-1D"]);
+      link("binance", `as:${r.symbol}`, "cotiza");
+    }
+
+    const byStatus = {};
+    for (const s of state.strategies) (byStatus[s.status] ||= []).push(s);
+    for (const s of state.strategies.filter((x) => ["LIVE_ELIGIBLE", "PAPER", "TESTING", "PREREGISTERED", "CANDIDATE"].includes(x.status))) {
+      add(`st:${s.strategy_id}`, s.strategy_id, "strategy", s.status === "LIVE_ELIGIBLE" ? 1.5 : 1, [`${s.status}${s.name ? " · " + s.name : ""}`, s.status_reason ? s.status_reason.slice(0, 200) : null, s.last_verdict ? `Último veredicto: ${s.last_verdict}` : null]);
+      link("lab", `st:${s.strategy_id}`, s.status === "LIVE_ELIGIBLE" ? "opera con" : "prueba en papel");
+      if (s.strategy_id.startsWith("S-CHANNEL-1D")) {
+        for (const r of (radar?.rows || []).filter((x) => x.in_strategy)) link(`st:${s.strategy_id}`, `as:${r.symbol}`, "vigila", 0.5);
+      }
+    }
+    if (byStatus.REJECTED) {
+      add("st:rejected", `Rechazadas (${byStatus.REJECTED.length})`, "rejected", 1, ["No pasaron el hard testing:", ...byStatus.REJECTED.slice(0, 10).map((s) => s.strategy_id)]);
+      link("lab", "st:rejected", "descartó", 0.4);
+    }
+    for (const s of (state.signals || []).filter((x) => x.signal === "ENTRY")) {
+      if (graphNodes.has(`st:${s.strategy_id}`) && graphNodes.has(`as:${s.symbol}`)) link(`st:${s.strategy_id}`, `as:${s.symbol}`, "señal de ENTRADA", 2);
+    }
+
+    const p = activeProposal();
+    if (p) {
+      add("proposal", `Propuesta ${p.symbol.replace("USDT", "")}`, "proposal", 1.4, [p.proposal_id, p.status, `Zona ${num(p.entry_low, 4)}–${num(p.entry_high, 4)} · stop ${num(p.invalidation, 4)}`]);
+      link("proposal", `as:${p.symbol}`, "compra", 1.5);
+      link("ag:chatgpt", "proposal", "revisa o ejecuta");
+    }
+    const pos = state.open_positions[0];
+    if (pos) {
+      add("position", `Posición ${pos.symbol.replace("USDT", "")}`, "proposal", 1.6, [`Entrada ${num(pos.entry_price, 4)} · stop ${num(pos.stop ?? pos.invalidation, 4)}`, `${num(pos.notional_usdt, 2)} USDT`]);
+      link("position", `as:${pos.symbol}`, "en", 2);
+      link("binance", "position", "custodia");
+    }
+
+    const fs = (state.forecast?.skill || [])[0];
+    add("tsfm", "TimesFM 3.0", "forecast", 1.2, ["Pronóstico en papel a 1, 3 y 7 días", fs ? `${fs.scored} puntuados · dirección ${pct(fs.direction_hit_rate, 0)}` : "Aún sin pronósticos vencidos", "Se decide a los 60 cierres (≈ 6 dic)"]);
+    link("ag:claude", "tsfm", "cita");
+    for (const s of Object.keys(f7)) if (graphNodes.has(`as:${s}`)) link("tsfm", `as:${s}`, "pronostica", 0.4);
+
+    const fg = (state.sentiment?.latest || []).find((r) => r.metric === "fear_greed");
+    add("sent", `Sentimiento${fg ? " · " + Math.round(fg.value) : ""}`, "sentiment", 1.1, [fg ? `Fear & Greed ${Math.round(fg.value)} (${fg.label || ""})` : null, "Contexto, no señal: los filtros de euforia empeoraban la estrategia"]);
+    link("ag:claude", "sent", "recoge");
+    for (const t of (state.sentiment?.tone_24h || []).filter((x) => x.items > 0)) if (graphNodes.has(`as:${t.symbol}`)) link("sent", `as:${t.symbol}`, `tono ${num(t.avg_sentiment, 2)}`, 0.3);
+
+    const th = state.ai_thesis || {};
+    add("thesis", "Tesis IA", "research", 1.3, [th.AI_BOTTLENECK ? th.AI_BOTTLENECK.title : "Informe mensual del día 25", "13F de Situational Awareness, capex y oferta física"]);
+    link("ag:claude", "thesis", "investiga");
+    link("lab", "thesis", "investigación", 0.5);
+    if (th.AI_BOTTLENECK) { add("neck", "Cuello de botella", "research", 0.9, [th.AI_BOTTLENECK.body.slice(0, 400)]); link("thesis", "neck", "concluye"); }
+    for (const b of (th["13F_BOOK"]?.data?.book || []).slice(0, 5)) {
+      add(`13f:${b.cusip}`, b.ticker || b.issuer.slice(0, 10), "research", 0.6 + b.weight * 3, [`${pct(b.weight, 1)} del libro 13F`, b.issuer]);
+      link("thesis", `13f:${b.cusip}`, "en el 13F", 0.5);
+    }
+
+    for (const pr of workspace?.projects || []) {
+      const id = `pj:${pr.name}`;
+      add(id, pr.name, /zyneath|medflow/i.test(pr.name) ? "zyneath" : pr.name === "money-engine" ? "money" : "project", 1 + Math.min(1, (pr.commits_7d || 0) / 30),
+        [pr.role, pr.error ? pr.error : `${pr.commits_7d} commits en 7 días`, pr.recent?.[0] ? `Último: ${pr.recent[0].subject} (${ago(pr.recent[0].at)})` : null]);
+      link("founder", id, "construye", 0.8);
+      if (pr.name === "AI Trading Lab") link(id, "lab", "código de", 1.2);
+      if (pr.name.startsWith("TimesFM")) link(id, "tsfm", "alimenta", 0.8);
+      for (const [author, n] of Object.entries(pr.authors_7d || {})) {
+        const pid = /juan|juanemen/i.test(author) ? "founder" : author === "Claude" ? "ag:claude" : `pe:${author}`;
+        if (!graphNodes.has(pid)) add(pid, author, "person", 0.9, [author === "Claude" ? "Agente de código" : "Colaborador"]);
+        link(pid, id, `${n} commit(s)`, 0.5);
+      }
+    }
+    const m = workspace?.money;
+    if (m && !m.error) {
+      add("money", "Money Printer", "money", 1.3, [m.paused ? "PAUSADO" : "Activo", m.video_engine_up ? "MoneyPrinterTurbo en línea" : "MoneyPrinterTurbo apagado",
+        `Hoy ${m.published_today}/${m.per_day ?? "—"} · ${Object.entries(m.counts || {}).map(([k, v]) => `${k} ${v}`).join(", ")}`]);
+      link("founder", "money", "gana con");
+      if (graphNodes.has("pj:money-engine")) link("pj:money-engine", "money", "motor", 1.2);
+      add("youtube", (m.platforms || ["youtube"]).join(", "), "money", 0.8, ["Plataforma de publicación de los shorts"]);
+      link("money", "youtube", "publica en");
+    }
+    const z = workspace?.zyneath;
+    if (z) {
+      const needed = Math.ceil(z.target_annual_usd / 12 / z.price_usd_month);
+      add("zyneath", "Zyneath", "zyneath", 1.6, [z.stage, `Meta: ${needed} clínicas × ${num(z.price_usd_month, 0)} USD/mes = ${num(z.target_annual_usd / 1e6, 1)} M USD/año`, z.active_clinics ? `${z.active_clinics} clínicas activas` : "Clínicas activas: sin dato"]);
+      link("founder", "zyneath", "funda", 1.2);
+      for (const pr of workspace.projects.filter((x) => /zyneath|medflow/i.test(x.name))) link("zyneath", `pj:${pr.name}`, "producto", 1.2);
+    }
+    for (const t of state.team || []) {
+      add(`tm:${t.member_id}`, t.display_name, "person", 0.9, [`Rol: ${t.role || "—"}`, t.active ? "Activo" : "Inactivo", `${t.steps_done} pasos de onboarding`]);
+      link(`tm:${t.member_id}`, "lab", "equipo");
+    }
+    for (const e of state.open_events.filter((x) => x.severity !== "info").slice(0, 4)) {
+      add(`ev:${e.id}`, e.kind, "alert", 0.8, [`${e.severity}: ${e.message.slice(0, 240)}`]);
+      link(`ev:${e.id}`, e.agent_id ? `ag:${e.agent_id}` : "lab", "alerta", 0.5);
+    }
+    return { nodes, links };
+  }
+
+  function showGraphCard(n) {
+    const card = $("graph-card");
+    if (!n) { card.hidden = true; return; }
+    const neigh = [];
+    const g = buildGraph();
+    for (const l of g.links) {
+      if (l.source === n.id) neigh.push([l.target, l.rel]);
+      else if (l.target === n.id) neigh.push([l.source, l.rel]);
+    }
+    card.hidden = false;
+    card.replaceChildren(
+      h("div", { class: "kind", text: GROUP_NAMES[n.group] || n.group }),
+      h("h3", { text: n.label }),
+      h("ul", {}, (n.info || []).map((line) => h("li", { text: line }))),
+      neigh.length ? h("div", { class: "links" }, neigh.slice(0, 16).map(([id, rel]) => h("button", { type: "button",
+        onclick: () => { const t = window.TV3D.focus(id); graphTourAt = Date.now() + 30_000; showGraphCard(t && graphNodes.get(id)); },
+        text: `${rel} → ${graphNodes.get(id)?.label || id}` }))) : null);
+  }
+
+  function refreshGraph() {
+    if (!state || !window.TV3D) return;
+    const g = buildGraph();
+    window.TV3D.setGraph(g);
+    const present = new Set(g.nodes.map((n) => n.group));
+    fill("graph-legend", Object.keys(GROUP_NAMES).filter((k) => present.has(k)).map((k) => {
+      const dot = h("i");
+      dot.style.color = GROUP_COLORS[k];
+      return h("span", {}, dot, GROUP_NAMES[k]);
+    }));
+  }
+
+  function setGraphMode(on) {
+    graphOn = on;
+    document.body.classList.toggle("graph", on);
+    $("graph-ui").hidden = !on;
+    if (window.TV3D) window.TV3D.set({ mode: on ? "graph" : "orbit" });
+    if (on) { refreshGraph(); graphTourAt = Date.now() + 6000; } else $("graph-card").hidden = true;
+  }
+
+  // Recorrido automático cuando nadie toca nada: va de nodo en nodo por lo más importante y muestra su ficha.
+  function graphTour() {
+    if (!graphOn || !window.TV3D || !window.TV3D.graphIdle() || Date.now() < graphTourAt) return;
+    const order = ["lab", "ag:claude", "ag:chatgpt", "binance", "proposal", "position", "rules", "tsfm", "thesis", "sent", "money", "zyneath", "founder",
+      ...[...graphNodes.keys()].filter((k) => k.startsWith("as:") || k.startsWith("st:") || k.startsWith("pj:"))].filter((k) => graphNodes.has(k));
+    const id = order[graphTourIdx++ % order.length];
+    window.TV3D.focus(id);
+    showGraphCard(graphNodes.get(id));
+    graphTourAt = Date.now() + 9000;
+  }
+
+  $("graph-toggle").addEventListener("click", () => setGraphMode(true));
+  $("graph-back").addEventListener("click", () => setGraphMode(false));
+  if (window.TV3D) {
+    window.TV3D.onGraphSelect((n) => { graphTourAt = Date.now() + 30_000; showGraphCard(n && graphNodes.get(n.id)); });
+  }
+  setInterval(graphTour, 1000);
+
   // ---------------------------------------------------------------- interacción
   document.addEventListener("keydown", (e) => {
+    if (e.key === "g" || e.key === "G") return setGraphMode(!graphOn);
+    if (e.key === "Escape" && graphOn) return setGraphMode(false);
+    if (graphOn) return;
     if (e.key === "ArrowRight") go(current + 1, true);
     else if (e.key === "ArrowLeft") go(current - 1, true);
     else if (/^[1-9]$/.test(e.key)) go(Number(e.key) - 1, true);
@@ -546,7 +755,7 @@
   let touchX = null;
   document.addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; }, { passive: true });
   document.addEventListener("touchend", (e) => {
-    if (touchX === null) return;
+    if (touchX === null || graphOn) return;
     const dx = e.changedTouches[0].clientX - touchX;
     if (Math.abs(dx) > 60) go(current + (dx < 0 ? 1 : -1), true);
     touchX = null;

@@ -152,6 +152,203 @@
     }
   }
 
+  // ---------------------------------------------------------------- mapa 3D (grafo de conocimiento, como Obsidian)
+  // Cada cosa del laboratorio es un nodo y cada relación real es un enlace; las posiciones salen de una simulación de
+  // fuerzas en 3D (repulsión entre nodos, resortes en los enlaces y gravedad hacia el centro).
+  const GROUP_RGB = {
+    hub: "255,77,109", agent: "69,224,176", alert: "255,77,109", market: "111,211,255", asset: "111,211,255",
+    hot: "255,181,71", strategy: "170,140,255", rejected: "120,110,160", research: "255,214,110", forecast: "120,230,255",
+    sentiment: "210,160,255", project: "90,150,255", person: "235,240,255", money: "80,230,140", zyneath: "255,130,200",
+    rules: "255,181,71", proposal: "255,77,109",
+  };
+  const graph = { nodes: [], links: [], byId: new Map(), alpha: 1, hover: null, selected: null, onSelect: null };
+  const gcam = { yaw: 0.4, pitch: 0.35, dist: 22, dragging: false, lastX: 0, lastY: 0, idleAt: 0, targetYaw: null };
+
+  function setGraph(g) {
+    const old = graph.byId;
+    graph.byId = new Map();
+    graph.nodes = g.nodes.map((n) => {
+      const prev = old.get(n.id);
+      const node = Object.assign(prev || { x: (Math.random() - 0.5) * 8, y: (Math.random() - 0.5) * 8, z: (Math.random() - 0.5) * 8, vx: 0, vy: 0, vz: 0 }, n);
+      graph.byId.set(n.id, node);
+      return node;
+    });
+    graph.links = g.links.filter((l) => graph.byId.has(l.source) && graph.byId.has(l.target))
+      .map((l) => ({ ...l, a: graph.byId.get(l.source), b: graph.byId.get(l.target) }));
+    // un nodo nuevo nace junto a su primer vecino, no en cualquier lugar
+    for (const l of graph.links) {
+      for (const [m, o] of [[l.a, l.b], [l.b, l.a]]) {
+        if (!old.has(m.id) && old.has(o.id) && !m.placed) { m.x = o.x + (Math.random() - 0.5); m.y = o.y + (Math.random() - 0.5); m.z = o.z + (Math.random() - 0.5); }
+        m.placed = true;
+      }
+    }
+    graph.neighbors = new Map(graph.nodes.map((n) => [n.id, new Set([n.id])]));
+    for (const l of graph.links) { graph.neighbors.get(l.a.id).add(l.b.id); graph.neighbors.get(l.b.id).add(l.a.id); }
+    if (graph.selected && !graph.byId.has(graph.selected.id)) graph.selected = null;
+    else if (graph.selected) graph.selected = graph.byId.get(graph.selected.id);
+    graph.alpha = Math.max(graph.alpha, old.size ? 0.3 : 1);
+  }
+
+  function simulate() {
+    const ns = graph.nodes, a = Math.max(0.02, graph.alpha);
+    for (let i = 0; i < ns.length; i++) {
+      const p = ns[i];
+      for (let j = i + 1; j < ns.length; j++) {
+        const q = ns[j];
+        let dx = p.x - q.x, dy = p.y - q.y, dz = p.z - q.z;
+        const d2 = dx * dx + dy * dy + dz * dz + 0.01;
+        const f = (a * 1.6 * (p.size || 1) * (q.size || 1)) / d2;
+        const d = Math.sqrt(d2);
+        dx /= d; dy /= d; dz /= d;
+        p.vx += dx * f; p.vy += dy * f; p.vz += dz * f;
+        q.vx -= dx * f; q.vy -= dy * f; q.vz -= dz * f;
+      }
+    }
+    for (const l of graph.links) {
+      const dx = l.b.x - l.a.x, dy = l.b.y - l.a.y, dz = l.b.z - l.a.z;
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.001;
+      const rest = 1.6 + ((l.a.size || 1) + (l.b.size || 1)) * 0.45;
+      const f = (d - rest) * 0.06 * a * Math.min(1.5, l.w || 1);
+      l.a.vx += (dx / d) * f; l.a.vy += (dy / d) * f; l.a.vz += (dz / d) * f;
+      l.b.vx -= (dx / d) * f; l.b.vy -= (dy / d) * f; l.b.vz -= (dz / d) * f;
+    }
+    for (const p of ns) {
+      if (p.pinned) { p.x = p.y = p.z = 0; p.vx = p.vy = p.vz = 0; continue; }
+      p.vx -= p.x * 0.012 * a; p.vy -= p.y * 0.012 * a; p.vz -= p.z * 0.012 * a;
+      p.vx *= 0.82; p.vy *= 0.82; p.vz *= 0.82;
+      p.x += p.vx; p.y += p.vy; p.z += p.vz;
+    }
+    graph.alpha *= 0.992;
+  }
+
+  function gproject(p) {
+    const q = rotX(rotY(p, gcam.yaw), gcam.pitch);
+    const z = q.z + gcam.dist;
+    if (z < 0.5) return null;
+    const s = (Math.min(W, H) * 1.05) / z;
+    return { x: W * 0.5 + q.x * s, y: H * 0.5 - q.y * s, s, z };
+  }
+
+  function drawGraph(dt, t) {
+    for (let k = 0; k < 2; k++) simulate();
+    // encuadre automático: la cámara se aleja o acerca para que todo el grafo quepa, salvo que el usuario haya hecho zoom
+    if (Date.now() > (gcam.userZoomUntil || 0)) {
+      let r = 1;
+      for (const n of graph.nodes) r = Math.max(r, Math.hypot(n.x, n.y, n.z));
+      gcam.dist += (Math.max(10, Math.min(90, r * 2.2)) - gcam.dist) * 0.03;
+    }
+    if (!gcam.dragging && Date.now() > gcam.idleAt) {
+      if (gcam.targetYaw !== null) {
+        let diff = gcam.targetYaw - gcam.yaw;
+        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        gcam.yaw += diff * 0.03;
+        if (Math.abs(diff) < 0.01) gcam.targetYaw = null;
+      } else gcam.yaw += dt * 0.06;
+    }
+    const focus = graph.hover || graph.selected;
+    const lit = focus ? graph.neighbors.get(focus.id) : null;
+    for (const n of graph.nodes) n._p = gproject(n);
+
+    ctx.lineWidth = Math.max(1, DPR);
+    for (const l of graph.links) {
+      const a = l.a._p, b = l.b._p;
+      if (!a || !b) continue;
+      const on = lit && lit.has(l.a.id) && lit.has(l.b.id) && (l.a === focus || l.b === focus);
+      const rgb = GROUP_RGB[l.b.group] || "150,170,255";
+      ctx.strokeStyle = `rgba(${rgb},${on ? 0.85 : lit ? 0.05 : 0.2})`;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+      // pulso de datos que recorre el enlace
+      if (on || Math.random() < 0.002) l.pulse = l.pulse ?? 0;
+      if (l.pulse !== undefined) {
+        l.pulse += dt * 0.6;
+        const k = l.pulse % 1;
+        glow({ x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k }, 5 * DPR, rgb, on ? 0.9 : 0.5);
+        if (!on && l.pulse > 1) delete l.pulse;
+      }
+    }
+
+    const order = graph.nodes.filter((n) => n._p).sort((m, n) => n._p.z - m._p.z);
+    for (const n of order) {
+      const p = n._p, rgb = GROUP_RGB[n.group] || "200,210,255";
+      const dim = lit && !lit.has(n.id);
+      const r = Math.max(4 * DPR, p.s * 0.13 * (n.size || 1));
+      const breathe = n.group === "alert" || n.group === "hot" || n.group === "proposal" ? 1 + 0.15 * Math.sin(t * 5) : 1;
+      glow(p, r * 3.2 * breathe, rgb, dim ? 0.12 : 0.4);
+      ctx.fillStyle = `rgba(${rgb},${dim ? 0.4 : 0.95})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * breathe, 0, TAU);
+      ctx.fill();
+      if (n === focus) {
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+        ctx.lineWidth = 2 * DPR;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r * 1.6 + Math.sin(t * 4) * 2 * DPR, 0, TAU);
+        ctx.stroke();
+      }
+      if (n.size >= 1.2 || (lit && lit.has(n.id)) || (!lit && n.size >= 0.9)) {
+        const f = Math.round(Math.max(11 * DPR, Math.min(26 * DPR, p.s * 0.045 * Math.sqrt(n.size || 1))));
+        ctx.font = `${n.size >= 1.6 ? 700 : 500} ${f}px "Segoe UI", system-ui, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillStyle = `rgba(238,242,255,${dim ? 0.35 : 0.92})`;
+        ctx.fillText(n.label, p.x, p.y + r + f * 1.1);
+      }
+    }
+  }
+
+  function pickNode(clientX, clientY) {
+    const x = clientX * DPR, y = clientY * DPR;
+    let best = null, bestD = Infinity;
+    for (const n of graph.nodes) {
+      if (!n._p) continue;
+      const r = Math.max(12 * DPR, n._p.s * 0.13 * (n.size || 1) * 1.8);
+      const d = Math.hypot(n._p.x - x, n._p.y - y);
+      if (d < r && d < bestD) { best = n; bestD = d; }
+    }
+    return best;
+  }
+
+  canvas.addEventListener("pointerdown", (e) => {
+    if (data.mode !== "graph") return;
+    gcam.dragging = true; gcam.moved = 0; gcam.lastX = e.clientX; gcam.lastY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (data.mode !== "graph") return;
+    if (gcam.dragging) {
+      const dx = e.clientX - gcam.lastX, dy = e.clientY - gcam.lastY;
+      gcam.moved += Math.abs(dx) + Math.abs(dy);
+      gcam.yaw += dx * 0.006;
+      gcam.pitch = Math.max(-1.2, Math.min(1.2, gcam.pitch + dy * 0.004));
+      gcam.lastX = e.clientX; gcam.lastY = e.clientY;
+      gcam.targetYaw = null;
+    } else {
+      const n = pickNode(e.clientX, e.clientY);
+      if (n !== graph.hover) { graph.hover = n; canvas.style.cursor = n ? "pointer" : "grab"; if (n && graph.onHover) graph.onHover(n); }
+    }
+    gcam.idleAt = Date.now() + 8000;
+  });
+  canvas.addEventListener("pointerup", (e) => {
+    if (data.mode !== "graph") return;
+    gcam.dragging = false;
+    if (gcam.moved < 6) {
+      const n = pickNode(e.clientX, e.clientY);
+      graph.selected = n;
+      if (graph.onSelect) graph.onSelect(n, true);
+    }
+    gcam.idleAt = Date.now() + 8000;
+  });
+  canvas.addEventListener("pointerleave", () => { graph.hover = null; });
+  canvas.addEventListener("wheel", (e) => {
+    if (data.mode !== "graph") return;
+    e.preventDefault();
+    gcam.dist = Math.max(6, Math.min(120, gcam.dist * (1 + Math.sign(e.deltaY) * 0.08)));
+    gcam.userZoomUntil = Date.now() + 60_000;
+    gcam.idleAt = Date.now() + 8000;
+  }, { passive: false });
+
   let last = performance.now(), t = 0, frameSkip = false;
   function frame(now) {
     requestAnimationFrame(frame);
@@ -168,13 +365,15 @@
     cam.pitch = 0.26 + Math.sin(t * 0.13) * 0.08;
 
     // estela: se borra con transparencia y deja rastro de movimiento
-    ctx.fillStyle = "rgba(3,8,24,0.42)";
+    // en el mapa se borra del todo: la estela dejaría copias fantasma de los nodos al girar
+    ctx.fillStyle = data.mode === "graph" ? "rgb(3,8,24)" : "rgba(3,8,24,0.42)";
     ctx.fillRect(0, 0, W, H);
 
     for (const s of stars) {
       const p = project(s);
       if (p) dot(p, 1.4 * DPR, 190, 205, 255, 0.35 + 0.35 * Math.sin(t * 1.5 + s.tw));
     }
+    if (data.mode === "graph") { drawGraph(dt, t); return; }
     rings.forEach((ring, ri) => {
       for (const q of ring) {
         const p = project(rotY(q, t * (0.05 + ri * 0.02)));
@@ -211,6 +410,18 @@
 
   window.TV3D = {
     set(patch) { Object.assign(data, patch); },
+    setGraph,
+    onGraphSelect(fn) { graph.onSelect = fn; },
+    onGraphHover(fn) { graph.onHover = fn; },
+    // recorrido automático: selecciona un nodo y gira la cámara para ponerlo de frente
+    focus(id) {
+      const n = graph.byId.get(id);
+      if (!n) return null;
+      graph.selected = n;
+      gcam.targetYaw = -Math.atan2(n.x, n.z);
+      return n;
+    },
+    graphIdle: () => Date.now() > gcam.idleAt,
     // un agente escribió en el diario: ráfaga de paquetes hacia el núcleo y hacia el otro agente
     pulse(agent) {
       const key = agent === "chatgpt" ? "chatgpt" : "claude";
