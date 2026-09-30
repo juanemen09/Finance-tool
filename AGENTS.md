@@ -78,7 +78,9 @@ Cualquiera de los dos agentes puede proponer. El otro revisa, el usuario autoriz
 3. El usuario autoriza en el chat, con Claude o con Codex. El agente que recibe la autorización la registra
    en `execution_authorizations` citando el mensaje del usuario, y si no es el ejecutor, avisa con un `ALERT`.
    Desde el 2026-09-26 vale aunque llegue antes de la revisión: basta con que el último veredicto del otro agente
-   sea `APPROVE` y no haya veto.
+   sea `APPROVE` y no haya veto. Desde el 2026-09-30 el usuario también puede autorizar o vetar **respondiendo al
+   correo de Claude** (`docs/email-decisions.md`). Claude lo registra y avisa a Codex con un `ALERT`, que se trata igual
+   que una autorización o un veto del chat. Codex no lee correo.
 4. **El ejecutor solo opera propuestas con `status = 'READY_TO_EXECUTE'` en `v_proposal_status`.** Justo antes
    de enviar la orden comprueba de nuevo precio, saldo y que la propuesta siga ahí: si el precio ya salió de
    la zona de entrada, no ejecuta y lo registra.
