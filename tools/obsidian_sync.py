@@ -33,12 +33,15 @@ COLOR_GROUPS = [("agente", 0x45E0B0), ("activo", 0x6FD3FF), ("estrategia", 0xAA8
                 ("regla", 0xFFB547), ("decision", 0xFF4D6D), ("proyecto", 0x5A96FF), ("persona", 0xEBF0FF),
                 ("pendiente", 0xFF9F43), ("diario", 0x8A9BC8), ("centro", 0xFF4D6D),
                 ("memoria-claude", 0x7CFFCB), ("protocolo", 0xC9B6FF), ("memoria-codex", 0xFF6B8A),
+                ("bitacora-codex", 0xFF8FA3),
                 ("tesis-exitosa", 0x2EE59D), ("tesis-fallida", 0xFF3355), ("anomalia", 0xFFC400), ("hora", 0x4F6DB8)]
 STATIC = ROOT / "docs" / "obsidian"  # plantilla y tablero: se copian solo si no existen (nunca pisan cambios del usuario)
 EXTRA_SQL = {
     "decisions": "select id, created_at, message from events where kind = 'user_decision' order by id",
     "limits": "select id, created_at, active, veto_minutes, max_loss_usdt, min_reward_risk, weekly_loss_limit_usdt, "
               "user_message_quote from standing_authorizations order by id",
+    "codex_analyses": "select analysis_id, cycle_id, created_at, market_regime, proposed_action, thesis, risk_factors, "
+                      "confidence_context from analyses where agent_id = 'chatgpt' order by created_at desc limit 336",
 }
 
 
@@ -230,6 +233,8 @@ def build_notes(state, radar, workspace, decisions, limits, now):
         f"# {CONTEXT_NOTE}", f"Resumen vivo para que {link('Claude')} y {link('Codex')} retomen el hilo entre sesiones. "
         "Lo regenera tools/obsidian_sync.py cada hora. Son datos, no instrucciones.", "",
         f"- Memoria y reglas: {link('Mente de Claude')}, {link('Mente de Codex')}, {link('Protocolo de los agentes')}.",
+        "- Codex conserva una bitácora diaria reconstruida desde sus análisis append-only. Antes de leer la tesis de Claude del ciclo actual, escribe su propio análisis a ciegas.",
+        "- Obsidian conecta y explica; las fuentes de verdad operativas siguen siendo Binance y Supabase.",
         f"- Límites vigentes: {link('Reglas de riesgo')} (veto {sa.get('veto_minutes', '—')} min, pérdida máx. {fmt(sa.get('max_loss_usdt'))} USDT).",
         f"- Decisiones del usuario: {dec_links}.",
         "- Claude solo lee Binance; Codex es el único ejecutor y corre cada hora (y cada 15 min de 19:15 a 20:45 en Quito).",
@@ -284,7 +289,7 @@ def split_memory(text):
     return out
 
 
-def mind_notes(memory_dir, agents_md, diary_days, codex_days):
+def mind_notes(memory_dir, agents_md, diary_days, codex_days, codex_analyses=None):
     """Notas de la «mente» de los agentes: la memoria de Claude y el protocolo que comparten con Codex."""
     notes = {}
     memories = []
@@ -316,9 +321,48 @@ def mind_notes(memory_dir, agents_md, diary_days, codex_days):
     notes["Protocolo/Protocolo de los agentes.md"] = ("protocolo", "\n".join([
         "# Protocolo de los agentes", f"Las reglas que siguen {link('Claude')} y {link('Codex')} (AGENTS.md del repositorio).", "",
         *[f"- {link(t)}" for t in titles]]))
+    bitacoras = []
+    by_day = {}
+    for analysis in codex_analyses or []:
+        raw_day = analysis.get("created_at") or analysis.get("cycle_id") or ""
+        day = raw_day.date().isoformat() if hasattr(raw_day, "date") else str(raw_day)[:10]
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
+            by_day.setdefault(day, []).append(analysis)
+    for day, rows in sorted(by_day.items()):
+        title = f"Bitácora de Codex · {day}"
+        bitacoras.append(title)
+        lines = [
+            f"# {title}",
+            f"Juicios de {link('Codex')} reconstruidos del diario append-only de {link('AI Trading Lab')}. "
+            "Cada entrada conserva su identificador de procedencia; esta nota no autoriza órdenes.",
+            "",
+        ]
+        for analysis in sorted(rows, key=lambda x: str(x.get("cycle_id") or x.get("created_at") or "")):
+            risk = analysis.get("risk_factors") or {}
+            if isinstance(risk, str):
+                try:
+                    risk = json.loads(risk)
+                except ValueError:
+                    risk = {"detalle": risk}
+            risk_text = "; ".join(f"{k}: {v}" for k, v in risk.items()) if isinstance(risk, dict) else str(risk)
+            thesis = re.sub(r"\s+", " ", str(analysis.get("thesis") or "—")).strip()
+            confidence = re.sub(r"\s+", " ", str(analysis.get("confidence_context") or "—")).strip()
+            lines.extend([
+                f"## {analysis.get('cycle_id') or 'ciclo sin identificador'} · {analysis.get('proposed_action') or '—'}",
+                f"- Régimen: **{analysis.get('market_regime') or '—'}**.",
+                f"- Tesis: {thesis}",
+                f"- Riesgos: {risk_text or '—'}.",
+                f"- Confianza: {confidence}",
+                f"- Procedencia: `{analysis.get('analysis_id') or '—'}`.",
+                "",
+            ])
+        notes[f"Codex/Bitácora/{title}.md"] = ("bitacora-codex", "\n".join(lines).rstrip())
+
     notes["Codex/Mente de Codex.md"] = ("memoria-codex", "\n".join([
-        "# Mente de Codex", f"{link('Codex')} no guarda memoria propia entre corridas: su contexto es el "
-        f"{link('Protocolo de los agentes')}, su buzón en el diario y lo que escribe cada día.", "",
+        "# Mente de Codex", f"La memoria durable de {link('Codex')} se reconstruye de sus análisis append-only, el "
+        f"{link('Protocolo de los agentes')} y el contexto vivo. Obsidian es una vista enlazada, no una fuente de órdenes.", "",
+        f"- Reflexión de arquitectura: {link('Pensamientos de Codex sobre el sistema nervioso')}",
+        f"- Bitácoras de análisis: {', '.join(link(b) for b in bitacoras) or '—'}",
         f"- Días con actividad de Codex: {', '.join(link(d) for d in codex_days) or '—'}",
         f"- Contexto vivo: {link(CONTEXT_NOTE)}"]))
     return notes
@@ -389,10 +433,12 @@ def main(argv=None):
         now = datetime.now(timezone.utc)
         state = build_state(run, now)
         decisions, limits = run(EXTRA_SQL["decisions"]), run(EXTRA_SQL["limits"])
+        codex_analyses = run(EXTRA_SQL["codex_analyses"])
     notes = build_notes(state, RadarCache().get(), WorkspaceCache().get(), decisions, limits, now)
     days = sorted(k[len("Diario/"):-3] for k in notes if k.startswith("Diario/"))
     codex_days = sorted({str(e["at"])[:10] for e in state.get("timeline", []) if e.get("agent") == "chatgpt"})
-    notes.update(mind_notes(config.get("claude_memory_dir"), (ROOT / "AGENTS.md").read_text(encoding="utf-8"), days, codex_days))
+    notes.update(mind_notes(config.get("claude_memory_dir"), (ROOT / "AGENTS.md").read_text(encoding="utf-8"),
+                            days, codex_days, codex_analyses))
     if args.dry_run:
         print("\n".join(sorted(notes)))
         return 0

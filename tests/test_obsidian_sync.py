@@ -52,11 +52,34 @@ class MindTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as mem:
             (Path(mem) / "MEMORY.md").write_text("- índice", encoding="utf-8")
             (Path(mem) / "infra.md").write_text(text, encoding="utf-8")
-            notes = mind_notes(mem, "# AGENTS\n## Roles\nClaude y Codex.\n## Sentimiento\nFear & Greed\n", ["2026-09-30"], ["2026-09-30"])
+            analyses = [{
+                "analysis_id": "A-CHATGPT-20260930T12Z",
+                "cycle_id": "2026-09-30T12Z",
+                "created_at": NOW,
+                "market_regime": "RANGE",
+                "proposed_action": "DO_NOTHING",
+                "thesis": "Sin señal válida; esperar protege el capital.",
+                "risk_factors": {"chase_risk": "precio extendido"},
+                "confidence_context": "Confianza moderada.",
+            }]
+            notes = mind_notes(
+                mem,
+                "# AGENTS\n## Roles\nClaude y Codex.\n## Sentimiento\nFear & Greed\n",
+                ["2026-09-30"],
+                ["2026-09-30"],
+                analyses,
+            )
         self.assertEqual(sum(k.startswith("Claude/Memoria/") for k in notes), 3, "MEMORY.md (el índice) no se copia")
         self.assertIn("[[Sentimiento]]", notes["Protocolo/Sentimiento.md"][1])
         self.assertIn("[[Roles]]", notes["Protocolo/Protocolo de los agentes.md"][1])
         self.assertIn("[[2026-09-30]]", notes["Codex/Mente de Codex.md"][1])
+        self.assertIn("[[Bitácora de Codex · 2026-09-30]]", notes["Codex/Mente de Codex.md"][1])
+        self.assertIn("[[Pensamientos de Codex sobre el sistema nervioso]]", notes["Codex/Mente de Codex.md"][1])
+        bitacora = notes["Codex/Bitácora/Bitácora de Codex · 2026-09-30.md"]
+        self.assertEqual(bitacora[0], "bitacora-codex")
+        self.assertIn("A-CHATGPT-20260930T12Z", bitacora[1])
+        self.assertIn("Sin señal válida", bitacora[1])
+        self.assertIn("precio extendido", bitacora[1])
 
 
 class WriteTest(unittest.TestCase):
