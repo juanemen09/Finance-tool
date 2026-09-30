@@ -54,21 +54,31 @@ def main(argv=None):
         print(json.dumps({"skipped": str(out), "reason": "ya existe el pronóstico de este cierre"}))
         return 0
 
-    free = free_commit_gb()
-    if free is not None and free < MIN_FREE_GB:
-        print(json.dumps({"error": f"memoria libre {free:.1f} GB < {MIN_FREE_GB} GB; se reintentará más tarde"}))
-        return 2
+    from tools import tsfm_client
+    if tsfm_client.ready():
+        # Servicio residente: el modelo ya está cargado; no depende de la memoria libre de este momento.
+        def predict(log_closes, horizon):
+            return tsfm_client.predict_quantiles(log_closes, horizon)
+    else:
+        free = free_commit_gb()
+        if free is not None and free < MIN_FREE_GB:
+            print(json.dumps({"error": f"servicio de TimesFM caído y memoria libre {free:.1f} GB < {MIN_FREE_GB} GB; "
+                                       "se reintentará más tarde"}))
+            return 2
+        import torch
+        from timesfm3 import ModelConfig, TimesFM3Forecaster
+        model = TimesFM3Forecaster(config=ModelConfig(device="cuda" if torch.cuda.is_available() else "cpu",
+                                                      quantiles=list(QUANTILES)))
 
-    import torch
-    from timesfm3 import ModelConfig, TimesFM3Forecaster
-    model = TimesFM3Forecaster(config=ModelConfig(device="cuda" if torch.cuda.is_available() else "cpu",
-                                                  quantiles=list(QUANTILES)))
+        def predict(log_closes, horizon):
+            return model.predict(context=np.asarray(log_closes, dtype=np.float32), horizon=horizon,
+                                 return_quantiles=True).quantiles
     rows = []
     for s, candles in series.items():
         candles = [c for c in candles if c.close_time < origin]
         closes = np.array([c.close for c in candles], dtype=float)
-        out_s = model.predict(context=np.log(closes).astype(np.float32), horizon=max(HORIZONS), return_quantiles=True)
-        rows += forecast_rows(s, origin, closes, np.asarray(out_s.quantiles)[:max(HORIZONS)].tolist())
+        q = np.asarray(predict(np.log(closes), max(HORIZONS)))
+        rows += forecast_rows(s, origin, closes, q[:max(HORIZONS)].tolist())
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"origin_close_time": stamp, "rows": rows}, indent=1), encoding="utf-8")
     print(json.dumps({"written": str(out), "rows": len(rows)}))

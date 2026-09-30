@@ -32,7 +32,9 @@ AGENT = {"claude": "Claude", "chatgpt": "Codex"}
 COLOR_GROUPS = [("agente", 0x45E0B0), ("activo", 0x6FD3FF), ("estrategia", 0xAA8CFF), ("investigacion", 0xFFD66E),
                 ("regla", 0xFFB547), ("decision", 0xFF4D6D), ("proyecto", 0x5A96FF), ("persona", 0xEBF0FF),
                 ("pendiente", 0xFF9F43), ("diario", 0x8A9BC8), ("centro", 0xFF4D6D),
-                ("memoria-claude", 0x7CFFCB), ("protocolo", 0xC9B6FF), ("memoria-codex", 0xFF6B8A)]
+                ("memoria-claude", 0x7CFFCB), ("protocolo", 0xC9B6FF), ("memoria-codex", 0xFF6B8A),
+                ("tesis-exitosa", 0x2EE59D), ("tesis-fallida", 0xFF3355), ("anomalia", 0xFFC400), ("hora", 0x4F6DB8)]
+STATIC = ROOT / "docs" / "obsidian"  # plantilla y tablero: se copian solo si no existen (nunca pisan cambios del usuario)
 EXTRA_SQL = {
     "decisions": "select id, created_at, message from events where kind = 'user_decision' order by id",
     "limits": "select id, created_at, active, veto_minutes, max_loss_usdt, min_reward_risk, weekly_loss_limit_usdt, "
@@ -395,6 +397,12 @@ def main(argv=None):
         print("\n".join(sorted(notes)))
         return 0
     written = write_notes(vault, notes)
+    for src in STATIC.rglob("*.md"):
+        dest = Path(vault) / FOLDER / src.relative_to(STATIC)
+        if not dest.exists():
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+            written += 1
     # La nota vieja «Contexto para Claude» pasó a llamarse «Contexto de los agentes»: se retira solo si nadie escribió
     # nada propio en ella (todo su texto está dentro del bloque generado).
     old = Path(vault) / FOLDER / "Contexto para Claude.md"

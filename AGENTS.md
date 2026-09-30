@@ -85,7 +85,10 @@ Cualquiera de los dos agentes puede proponer. El otro revisa, el usuario autoriz
    que una autorización o un veto del chat. Codex no lee correo.
 4. **El ejecutor solo opera propuestas con `status = 'READY_TO_EXECUTE'` en `v_proposal_status`.** Justo antes
    de enviar la orden comprueba de nuevo precio, saldo y que la propuesta siga ahí: si el precio ya salió de
-   la zona de entrada, no ejecuta y lo registra.
+   la zona de entrada, no ejecuta y lo registra. Desde el 2026-09-30 también mide el libro de órdenes en vivo
+   (`python -m tools.orquestador guardia <PAR>` o su propio MCP) y **no ejecuta si el spread supera el 0,2 % o el
+   deslizamiento estimado de la orden supera el 0,15 %**; lo registra como evento `warning` kind `execution_guard`.
+   Los stops y las salidas se ejecutan igual: salir nunca se bloquea.
 5. Tras ejecutar, inserta en `trades` con los datos de las órdenes reales de Binance y envía
    `EXECUTION_DONE` al otro agente. Si faltaba algún requisito, la base registra el trade igualmente, lo marca
    `gate_passed = false` y abre un evento crítico.
