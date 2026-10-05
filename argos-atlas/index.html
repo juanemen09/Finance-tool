@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Argos-Atlas</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6' fill='none' stroke='%234ade80' stroke-width='2'/><circle cx='8' cy='8' r='2' fill='%234ade80'/></svg>" />
+  </head>
+  <body class="h-dvh overflow-hidden bg-tactico-900 font-mono text-slate-200">
+    <div class="flex h-full flex-col md:flex-row">
+      <aside id="panel" class="z-[1000] flex max-h-[45dvh] w-full shrink-0 flex-col gap-4 overflow-y-auto border-b border-neon/20 bg-tactico-800/95 p-4 md:max-h-none md:w-80 md:border-r md:border-b-0">
+        <header class="flex items-baseline justify-between">
+          <h1 class="text-lg font-bold tracking-[0.3em] text-neon">ARGOS·ATLAS</h1>
+          <span class="text-[10px] tracking-widest text-slate-500">MANDO LOCAL</span>
+        </header>
+
+        <section class="flex flex-col gap-2">
+          <h2 class="titulo-seccion">Capas en vivo</h2>
+
+          <label class="fila-capa">
+            <span class="flex items-center gap-2"><i class="punto bg-ambar"></i>Vuelos</span>
+            <span class="flex items-center gap-3"><b id="n-vuelos" class="contador">—</b><input type="checkbox" id="t-vuelos" class="interruptor" checked /></span>
+          </label>
+          <p id="e-vuelos" class="estado">OpenSky Network</p>
+
+          <label class="fila-capa">
+            <span class="flex items-center gap-2"><i class="punto bg-cian"></i>Barcos</span>
+            <span class="flex items-center gap-3"><b id="n-barcos" class="contador">—</b><input type="checkbox" id="t-barcos" class="interruptor" checked /></span>
+          </label>
+          <p id="e-barcos" class="estado">AIS abierto</p>
+
+          <label class="fila-capa">
+            <span class="flex items-center gap-2"><i class="punto bg-magenta"></i>Cámaras</span>
+            <span class="flex items-center gap-3"><b id="n-camaras" class="contador">—</b><input type="checkbox" id="t-camaras" class="interruptor" checked /></span>
+          </label>
+          <p id="e-camaras" class="estado">TfL · NYC DOT · Fintraffic</p>
+          <p class="text-[10px] leading-snug text-slate-500">Solo se piden los objetivos dentro de la vista actual.</p>
+        </section>
+
+        <section class="flex flex-col gap-2">
+          <h2 class="titulo-seccion">Operaciones domésticas</h2>
+          <label class="fila-capa">
+            <span>Ocultar/Mostrar Plano de Operaciones Domésticas</span>
+            <input type="checkbox" id="t-plano" class="interruptor" checked />
+          </label>
+          <div class="flex items-center justify-between">
+            <span id="fuente-presencia" class="rounded border border-ambar/60 px-1.5 py-0.5 text-[10px] tracking-widest text-ambar">SIMULADO</span>
+            <button id="ir-plano" class="rounded border border-neon/40 px-2 py-1 text-xs text-neon hover:bg-neon/10">Ir al plano ⌖</button>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span>Presencias</span><b id="n-presencia" class="contador">0</b>
+          </div>
+          <ul id="lista-presencia" class="flex flex-col gap-1 text-[11px] text-slate-400"></ul>
+        </section>
+
+        <footer class="mt-auto text-[10px] leading-snug text-slate-500">
+          Datos: OpenSky Network, Digitraffic/Fintraffic (CC BY 4.0), aisstream.io, Transport for London, NYC DOT. Mapa ©
+          OpenStreetMap, © CARTO. La presencia doméstica es simulada hasta conectar un sensor RuView.
+        </footer>
+      </aside>
+
+      <main id="map" class="min-h-0 flex-1"></main>
+    </div>
+
+    <div id="modal-camara" class="fixed inset-0 z-[2000] hidden items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true">
+      <div class="flex max-h-full w-full max-w-3xl flex-col gap-2 rounded border border-magenta/40 bg-tactico-800 p-3">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <h3 id="cam-titulo" class="truncate text-sm font-bold text-magenta"></h3>
+            <p id="cam-fuente" class="text-[11px] text-slate-400"></p>
+          </div>
+          <button id="cam-cerrar" class="rounded border border-slate-600 px-2 text-sm hover:bg-slate-700" aria-label="Cerrar">✕</button>
+        </div>
+        <div id="cam-cuerpo" class="flex min-h-48 items-center justify-center bg-black"></div>
+        <div class="flex items-center justify-between text-[11px] text-slate-400">
+          <span id="cam-hora"></span>
+          <button id="cam-video" class="hidden rounded border border-magenta/40 px-2 py-0.5 text-magenta hover:bg-magenta/10">Ver clip de vídeo</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

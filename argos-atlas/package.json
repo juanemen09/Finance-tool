@@ -1,0 +1,28 @@
+{
+  "name": "argos-atlas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mapa táctico local: vuelos (OpenSky), barcos (AIS abierto), cámaras públicas y plano doméstico con emulador de RuView.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "server": "node server.js",
+    "build": "vite build",
+    "start": "vite build && node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "leaflet": "^1.9.4",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.2"
+  }
+}

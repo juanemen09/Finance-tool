@@ -1,0 +1,142 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-tactico-900: #070b10;
+  --color-tactico-800: #0d141c;
+  --color-neon: #4ade80;
+  --color-ambar: #fbbf24;
+  --color-cian: #22d3ee;
+  --color-magenta: #f472b6;
+}
+
+@layer components {
+  .titulo-seccion {
+    @apply border-b border-neon/20 pb-1 text-[11px] tracking-[0.25em] text-neon/80 uppercase;
+  }
+  .fila-capa {
+    @apply flex cursor-pointer items-center justify-between gap-3 text-sm select-none;
+  }
+  .punto {
+    @apply inline-block h-2 w-2 rounded-full;
+  }
+  .contador {
+    @apply min-w-10 text-right text-neon tabular-nums;
+  }
+  .estado {
+    @apply -mt-1 truncate text-[10px] text-slate-500;
+  }
+  .estado.error {
+    @apply text-red-400;
+  }
+  .estado.aviso {
+    @apply text-ambar;
+  }
+  .interruptor {
+    @apply relative h-4 w-8 shrink-0 cursor-pointer appearance-none rounded-full bg-slate-700 transition-colors checked:bg-neon/70;
+  }
+  .interruptor::after {
+    content: '';
+    @apply absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-slate-200 transition-transform;
+  }
+  .interruptor:checked::after {
+    @apply translate-x-4;
+  }
+}
+
+/* Leaflet en tono táctico */
+.leaflet-container {
+  background: #070b10;
+  font-family: inherit;
+}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip,
+.leaflet-tooltip {
+  background: #0d141c;
+  color: #e2e8f0;
+  border: 1px solid rgb(74 222 128 / 0.35);
+  box-shadow: none;
+}
+.leaflet-popup-content {
+  margin: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.leaflet-popup-content dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 10px;
+}
+.leaflet-popup-content dt {
+  color: #64748b;
+}
+.leaflet-bar a {
+  background: #0d141c;
+  color: #4ade80;
+  border-color: rgb(74 222 128 / 0.25);
+}
+.leaflet-control-attribution {
+  background: rgb(13 20 28 / 0.8) !important;
+  color: #64748b;
+}
+.leaflet-control-attribution a {
+  color: #94a3b8;
+}
+.etiqueta-sala {
+  background: transparent;
+  border: none;
+  color: rgb(74 222 128 / 0.75);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.etiqueta-sala::before {
+  display: none;
+}
+
+/* Pulso del radar: solo transform y opacity, que anima la GPU sin tocar el hilo de JavaScript. */
+.pulso-radar {
+  pointer-events: none;
+}
+.pulso-radar::before,
+.pulso-radar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid #4ade80;
+  border-radius: 50%;
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: onda 2.4s ease-out infinite;
+}
+.pulso-radar::after {
+  animation-delay: 1.2s;
+}
+.pulso-radar.movimiento::before,
+.pulso-radar.movimiento::after {
+  border-color: #fbbf24;
+  animation-duration: 1.2s;
+}
+.pulso-radar.movimiento::after {
+  animation-delay: 0.6s;
+}
+@keyframes onda {
+  0% {
+    transform: scale(0.2);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulso-radar::before,
+  .pulso-radar::after {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+.leaflet-bar a.leaflet-disabled {
+  background: #0d141c;
+  color: #334155;
+}

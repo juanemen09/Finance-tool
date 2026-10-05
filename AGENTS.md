@@ -282,6 +282,18 @@ Codex» y «Protocolo de los agentes». Puede usar notas horarias ya cerradas co
 Claude del ciclo actual antes de insertar su propio análisis a ciegas**. Después de insertarlo sí puede leerla para
 revisar o discrepar. Obsidian nunca autoriza una orden ni reemplaza las comprobaciones frescas en Binance y Supabase.
 
+## Argos-Atlas: seguridad de casa y oficina (pedido del usuario, 2026-10-05)
+
+`argos-atlas/` (Node, `npm run dev`, solo en 127.0.0.1) es un mapa táctico con vuelos (OpenSky), barcos (AIS de
+Digitraffic y aisstream.io) y cámaras públicas (TfL, NYC DOT, Fintraffic) en tiempo real, más un plano 2D del hogar
+con las presencias de RuView. Detalle en `argos-atlas/README.md`.
+
+- Es seguridad, no trading: no lee ni escribe el diario y nadie propone, aprueba ni rechaza una operación por lo que
+  muestre.
+- Las presencias salen de un **emulador** (`RUVIEW_SIMULADOR=1`, insignia `SIMULADO`) hasta que el usuario conecte
+  nodos ESP32 con RuView. Ningún agente las presenta como personas reales.
+- La ubicación del plano va solo en `argos-atlas/.env` (`PLANO_LAT`/`PLANO_LNG`), nunca en el repositorio.
+
 ## Equipo humano (pedido del usuario, 2026-09-27)
 
 La startup suma personas (onboarding en `docs/team/`, módulo `python -m team`). Quedan registradas en

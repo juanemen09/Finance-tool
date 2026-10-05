@@ -24,6 +24,7 @@ El protocolo entre agentes está en [AGENTS.md](AGENTS.md).
 | `ai_trading_lab/sentiment.py` | Sentimiento: parseo de Fear & Greed, funding, largo/corto, RSS y Bluesky; tono con VADER + léxico cripto. |
 | `tools/ingest_sentiment.py` | Recolector horario de sentimiento y titulares; genera el SQL de inserción. |
 | `dashboard/` | Centro de mando local: servidor de solo lectura en 127.0.0.1 y la interfaz. |
+| `argos-atlas/` | Mapa táctico de seguridad (Node): vuelos, barcos y cámaras públicas en vivo, más el plano del hogar con RuView (emulado). Aparte del trading. |
 | `team/`, `config/team/`, `docs/team/` | Equipo: onboarding de personas nuevas, inventario del stack y registro de miembros y accesos en el diario. |
 | `docs/plans/strategy-pipeline.md` | Protocolo del pipeline de estrategias. |
 | `tests/` | Pruebas unitarias (Python) y de comportamiento del esquema (SQL). |
