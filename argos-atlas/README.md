@@ -126,7 +126,8 @@ Copia `.env.example` como `.env` (git lo ignora).
 
 | Capa | Fuente | Clave | Notas |
 |---|---|---|---|
-| Vuelos | [OpenSky Network](https://opensky-network.org) `/states/all` | Opcional | Solo se pide la zona visible (bounding box). Se renueva cada 15 s. La matrícula y el modelo se piden al abrir el popup. |
+| Vuelos | [OpenSky Network](https://opensky-network.org) `/states/all` | Opcional | Solo se pide la zona visible (bounding box). Se renueva cada 15 s. |
+| Matrícula | [adsbdb.com](https://www.adsbdb.com) | No | Matrícula, modelo y propietario, al abrir el popup de un avión (OpenSky retiró su endpoint de metadatos). |
 | Barcos | [Digitraffic](https://www.digitraffic.fi/en/marine-traffic/) (Fintraffic, CC BY 4.0) | No | AIS real del Báltico. Se renueva cada 20 s y oculta las posiciones de más de 1 h. |
 | Barcos | [aisstream.io](https://aisstream.io) | Sí, gratuita | AIS mundial por WebSocket. El servidor solo se suscribe a la zona que estás mirando. |
 | Cámaras | [TfL JamCams](https://api.tfl.gov.uk) (Londres) | No | Imagen y clip de vídeo corto. |

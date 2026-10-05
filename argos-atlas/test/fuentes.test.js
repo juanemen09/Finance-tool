@@ -12,6 +12,9 @@ const RESPUESTAS = {
       ['ffffff', '', 'X', 1, 2, null, null, null, false, null, null, null, null, null, null, false, 0], // sin posición
     ],
   },
+  'api.adsbdb.com/v0/aircraft/4ca123': {
+    response: { aircraft: { type: '737-8AS', icao_type: 'B738', manufacturer: 'Boeing', mode_s: '4CA123', registration: 'EI-DCL', registered_owner: 'Ryanair' } },
+  },
   'meri.digitraffic.fi/api/ais/v1/locations': {
     type: 'FeatureCollection',
     features: [
@@ -42,7 +45,7 @@ globalThis.fetch = async (url) => {
   return new Response(JSON.stringify(RESPUESTAS[clave]), { status: 200, headers: { 'x-rate-limit-remaining': '397' } });
 };
 
-const { vuelosEn, estadoOpenSky } = await import('../server/opensky.js');
+const { vuelosEn, estadoOpenSky, metadatosAvion } = await import('../server/opensky.js');
 const { barcosEn } = await import('../server/ais.js');
 const { camarasEn } = await import('../server/camaras.js');
 
@@ -52,6 +55,11 @@ test('vuelos: solo los de la vista, con posición, y créditos restantes', async
   assert.equal(vuelos[0][1], 'RYR12A');
   assert.equal(vuelos[1][6], 1, 'en tierra');
   assert.equal(estadoOpenSky().creditosRestantes, 397);
+});
+
+test('matrícula desde adsbdb; si no la conoce, campos vacíos', async () => {
+  assert.deepEqual(await metadatosAvion('4ca123'), { matricula: 'EI-DCL', modelo: 'Boeing 737-8AS', operador: 'Ryanair' });
+  assert.deepEqual(await metadatosAvion('abcdef'), { matricula: null, modelo: null, operador: null });
 });
 
 test('barcos: proa 511 = sin dato, posiciones viejas fuera, nombre desde metadatos', async () => {

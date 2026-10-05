@@ -90,15 +90,17 @@ export async function vuelosEn(bbox) {
 }
 
 // Matrícula y modelo: no vienen en los vectores de estado, se piden solo al abrir el popup de un avión.
+// OpenSky retiró su endpoint de metadatos (410 Gone, 2026); se usa adsbdb.com (gratuito, sin clave).
 // Un fallo no se guarda en caché: el siguiente clic lo vuelve a intentar.
 export async function metadatosAvion(icao24) {
   try {
     return await cacheMeta.obtener(icao24, async () => {
-      const { json } = await pedirJson(`${API}/metadata/aircraft/icao/${icao24}`, { headers: await cabeceraAuth(), timeoutMs: 10000 });
+      const { json } = await pedirJson(`https://api.adsbdb.com/v0/aircraft/${icao24}`, { timeoutMs: 10000 });
+      const a = json?.response?.aircraft ?? {};
       return {
-        matricula: json.registration || null,
-        modelo: [json.manufacturerName, json.model].filter(Boolean).join(' ') || json.typecode || null,
-        operador: json.operator || json.owner || null,
+        matricula: a.registration || null,
+        modelo: [a.manufacturer, a.type].filter(Boolean).join(' ') || a.icao_type || null,
+        operador: a.registered_owner || null,
       };
     });
   } catch {
