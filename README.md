@@ -53,6 +53,10 @@ Configuración (una vez):
 
 La contraseña nunca se escribe en el chat ni en el repositorio.
 
+**Pestaña Seguridad.** `http://127.0.0.1:8765/seguridad` muestra Argos-Atlas (vuelos, barcos, cámaras y el plano de
+casa con RuView) dentro del panel. Al arrancar, el panel lo levanta con Docker si no está en marcha (`--sin-argos` lo
+evita). Las claves de Argos van en `argos-atlas/.env`: ver [argos-atlas/README.md](argos-atlas/README.md#claves-api-paso-a-paso).
+
 ### Ingesta directa del recolector (ahorra uso)
 
 El ciclo horario inserta los titulares con un rol que solo puede **añadir** filas en `news_items` y

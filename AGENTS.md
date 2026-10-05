@@ -293,6 +293,8 @@ con las presencias de RuView. Detalle en `argos-atlas/README.md`.
 - Arranque: `docker compose up -d --build` en `argos-atlas/`. Con `RUVIEW_URL` y el perfil `ruview`, la presencia
   viene del sensing-server real de RuView (nodos ESP32). Sin él, viene de un **emulador** (insignia `SIMULADO`).
   Ningún agente presenta como personas reales las insignias `SIMULADO` o `RUVIEW · DEMO`.
+- También es la pestaña **Seguridad** del centro de mando (`http://127.0.0.1:8765/seguridad`). `python -m dashboard`
+  la arranca con Docker si no responde.
 - La ubicación del plano va solo en `argos-atlas/.env` (`PLANO_LAT`/`PLANO_LNG`), nunca en el repositorio.
 
 ## Equipo humano (pedido del usuario, 2026-09-27)

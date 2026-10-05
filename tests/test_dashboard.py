@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
+from dashboard.argos import DEFAULT_URL, ArgosStatus, argos_origin, start_if_down
 from dashboard.config import load_env
 from dashboard.health import agent_health
 from dashboard.market import MarketError, candles_payload, liquidity_payload, radar_row, validate_candles_request
@@ -178,7 +179,14 @@ class ServerTest(unittest.TestCase):
                 cls.stored.append((question, source))
                 return {"id": "x", "question": question}
 
+        class FakeArgos:
+            url = "http://127.0.0.1:8787"
+
+            def __call__(self):
+                return {"ok": True, "url": self.url, "presencia": {"modo": "simulador", "sensor": None}}
+
         cls.server = make_server(0, state_provider=lambda: {"ok": True}, predictions=FakePredictions,
+                                 argos_provider=FakeArgos(),
                                  candles_provider=lambda s, i: {"symbol": s, "interval": i, "candles": []},
                                  liquidity_provider=lambda: {"supply": [], "growth_30d": []},
                                  radar_provider=lambda: {"rows": []})
@@ -238,6 +246,23 @@ class ServerTest(unittest.TestCase):
             self.assertIn(marker, body, path)
             self.assertIn("default-src 'self'", headers["Content-Security-Policy"])
 
+    def test_security_tab_frames_only_argos(self):
+        status, headers, body = self.get("/seguridad")
+        self.assertEqual(status, 200)
+        self.assertIn(b"/static/seguridad.js", body)
+        csp = headers["Content-Security-Policy"]
+        self.assertIn("frame-src http://127.0.0.1:8787", csp)
+        self.assertIn("frame-ancestors 'none'", csp)  # el panel en sí no se deja enmarcar
+        status, _, body = self.get("/static/seguridad.js")
+        self.assertEqual(status, 200)
+        self.assertIn(b"/api/argos", body)
+        status, _, body = self.get("/api/argos")
+        self.assertEqual(json.loads(body)["url"], "http://127.0.0.1:8787")
+
+    def test_main_page_links_to_security(self):
+        _, _, body = self.get("/")
+        self.assertIn(b'href="/seguridad"', body)
+
     def test_radar_endpoint(self):
         status, _, body = self.get("/api/radar")
         self.assertEqual((status, json.loads(body)), (200, {"rows": []}))
@@ -278,3 +303,49 @@ class ServerTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ArgosTest(unittest.TestCase):
+    def test_only_local_http_origins(self):
+        self.assertEqual(argos_origin("http://localhost:9000/"), "http://localhost:9000")
+        self.assertEqual(argos_origin("http://127.0.0.1:8787"), "http://127.0.0.1:8787")
+        for bad in ["https://evil.example.com", "http://evil.example.com:8787", "http://127.0.0.1", "javascript:alert(1)",
+                    "http://127.0.0.1:8787/ruta", "http://127.0.0.1:abc", "", None]:
+            self.assertEqual(argos_origin(bad), DEFAULT_URL, bad)
+
+    def test_status_reports_presence_or_how_to_start(self):
+        class Answer:
+            def __init__(self, data):
+                self.data = data
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def read(self):
+                return json.dumps(self.data).encode()
+
+        def up(url, timeout):
+            self.assertEqual(url, "http://127.0.0.1:8787/api/estado")
+            return Answer({"presencia": {"modo": "ruview", "sensor": {"conectado": True, "fuente": "esp32"}}, "opensky": {}})
+
+        def down(url, timeout):
+            raise urllib.error.URLError("connection refused")
+
+        ok = ArgosStatus(opener=up)()
+        self.assertEqual(ok, {"ok": True, "url": DEFAULT_URL,
+                              "presencia": {"modo": "ruview", "sensor": {"conectado": True, "fuente": "esp32"}}})
+        caido = ArgosStatus(opener=down)()
+        self.assertFalse(caido["ok"])
+        self.assertIn("docker compose up", caido["arranque"])
+
+    def test_start_if_down_uses_docker_only_when_needed(self):
+        calls = []
+        runner = lambda cmd, **kw: calls.append((cmd, kw["cwd"].name))
+        self.assertIn("ya está", start_if_down(lambda: {"ok": True}, runner=runner))
+        self.assertIn("no encuentro Docker", start_if_down(lambda: {"ok": False}, runner=runner, which=lambda _: None))
+        self.assertEqual(calls, [])
+        self.assertIn("Arrancando", start_if_down(lambda: {"ok": False}, runner=runner, which=lambda _: "/usr/bin/docker"))
+        self.assertEqual(calls, [(["docker", "compose", "up", "-d", "--build"], "argos-atlas")])

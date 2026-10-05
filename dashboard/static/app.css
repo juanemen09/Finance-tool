@@ -281,3 +281,22 @@ footer a { color: var(--muted); }
 @media (prefers-reduced-motion: reduce) {
   .core { animation: none; }
 }
+
+/* Navegación entre secciones del centro de mando */
+.nav { display: flex; gap: 6px; justify-content: center; }
+.nav a {
+  color: var(--muted); text-decoration: none; padding: 6px 14px; border-radius: 999px;
+  border: 1px solid var(--line); font-size: 13px; letter-spacing: 0.06em;
+}
+.nav a:hover { color: var(--ink); border-color: rgba(130, 160, 255, 0.4); }
+.nav a[aria-current="page"] { color: var(--ink); background: rgba(220, 20, 60, 0.22); border-color: var(--crimson); }
+.top-nav { grid-column: 1 / -1; justify-content: flex-start; }
+
+/* Pestaña Seguridad: Argos-Atlas a pantalla completa bajo la cabecera */
+.shell-seguridad { display: flex; flex-direction: column; height: 100dvh; }
+.argos-frame { flex: 1; width: 100%; min-height: 0; border: 1px solid var(--line); border-radius: var(--radius); padding: 0; overflow: hidden; }
+.argos-estado { font-size: 12px; color: var(--muted); text-align: right; }
+.argos-estado.ok { color: var(--ok); }
+.argos-estado.caido { color: var(--warn); }
+.argos-caido pre { background: rgba(0, 0, 0, 0.35); padding: 10px 14px; border-radius: 10px; overflow-x: auto; }
+.argos-caido .muted { color: var(--muted); }

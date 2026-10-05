@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 import psycopg
 from psycopg.rows import dict_row
 
+from dashboard.argos import ArgosStatus, start_if_down
 from dashboard.config import load_env
 from dashboard.hourly import HourlyCache
 from dashboard.market import CandleCache, LiquidityCache, RadarCache
@@ -65,25 +66,31 @@ def main():
     parser = argparse.ArgumentParser(description="Centro de mando local de AI Trading Lab (solo lectura)")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--no-browser", action="store_true")
+    parser.add_argument("--sin-argos", action="store_true", help="no arrancar Argos-Atlas (pestaña Seguridad)")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    url = load_env().get("DASHBOARD_DATABASE_URL")
+    env = load_env()
+    url = env.get("DASHBOARD_DATABASE_URL")
     if not url:
         sys.exit("Falta DASHBOARD_DATABASE_URL en .env (conexión del rol dashboard_reader). Ver README.")
     if "dashboard_reader" not in url:
         sys.exit("DASHBOARD_DATABASE_URL debe usar el rol de solo lectura dashboard_reader, no otro usuario.")
 
+    argos = ArgosStatus(env.get("ARGOS_URL"))
     candles = CandleCache()
     try:
         server = make_server(args.port, state_provider=CachedState(ReadOnlyDatabase(url)), candles_provider=candles.get,
                              liquidity_provider=LiquidityCache().get, radar_provider=RadarCache().get,
                              workspace_provider=WorkspaceCache().get, predictions=predicciones,
-                             hourly_provider=HourlyCache().get)
+                             hourly_provider=HourlyCache().get, argos_provider=argos)
     except OSError:
         sys.exit(f"El puerto {args.port} ya está en uso: probablemente el panel ya está abierto. Ciérralo o usa --port.")
     address = f"http://127.0.0.1:{server.server_address[1]}/"
     print(f"Centro de mando en {address}  (Ctrl+C para cerrar)")
+    print(f"Seguridad (Argos-Atlas) en {address}seguridad")
+    if not args.sin_argos:
+        print(start_if_down(argos))
     if not args.no_browser:
         webbrowser.open(address)
     try:

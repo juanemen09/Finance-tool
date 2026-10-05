@@ -38,6 +38,12 @@ const TOKEN_INGESTA = process.env.ARGOS_INGEST_TOKEN || randomBytes(16).toString
 
 const app = express();
 app.disable('x-powered-by');
+// Solo el propio Argos y el centro de mando de AI Trading Lab (pestaña Seguridad) pueden mostrarlo en un marco.
+const PANELES = (process.env.ARGOS_PANELES || 'http://127.0.0.1:8765 http://localhost:8765').split(/\s+/).filter((o) => /^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(o));
+app.use((_req, res, next) => {
+  res.setHeader('Content-Security-Policy', `frame-ancestors 'self' ${PANELES.join(' ')}`);
+  next();
+});
 app.use(cors({ origin: [/^http:\/\/(127\.0\.0\.1|localhost):\d+$/] }));
 
 const conBbox = (fn) => async (req, res, next) => {

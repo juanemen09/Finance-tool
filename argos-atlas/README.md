@@ -74,6 +74,40 @@ triangulación, y el mapa la marca así. Para alinearla con tu plano usa `RUVIEW
 Necesitas Node.js 20 o superior: `npm install` y luego `npm run dev`, y abre `http://127.0.0.1:5173`. `npm start`
 compila y sirve todo en `:8787`. `npm test` corre las pruebas.
 
+## Dentro del centro de mando (pestaña Seguridad)
+
+Argos-Atlas aparece también como pestaña **Seguridad** del centro de mando de AI Trading Lab:
+`http://127.0.0.1:8765/seguridad`. Al abrirse, `python -m dashboard` comprueba si Argos responde y, si no, lo arranca
+con `docker compose up -d --build` (necesita Docker Desktop abierto). Usa `--sin-argos` para que no lo haga. Si Argos
+corre en otro puerto, pon `ARGOS_URL=http://127.0.0.1:PUERTO` en el `.env` de la raíz.
+
+Argos solo se deja mostrar en un marco desde sí mismo y desde el panel (`127.0.0.1:8765` y `localhost:8765`). Para otro
+puerto del panel, usa `ARGOS_PANELES` en `argos-atlas/.env`.
+
+## Claves API, paso a paso
+
+Todas van en `argos-atlas/.env`, que git ignora. Nunca en el chat ni en el repositorio.
+
+1. **Crea el archivo.** En PowerShell, dentro de `argos-atlas`: `copy .env.example .env`, y luego `notepad .env`.
+2. **OpenSky (vuelos), recomendado.**
+   1. Crea una cuenta gratuita en https://opensky-network.org (botón *Login* → *Register*).
+   2. Ya dentro, abre tu página de cuenta (*Account*) y busca la sección **API Client**. Pulsa *Create*: te da un
+      `client_id` y un `client_secret` (puedes descargarlos como `credentials.json`).
+   3. En `.env`: `OPENSKY_CLIENT_ID=<client_id>` y `OPENSKY_CLIENT_SECRET=<client_secret>`.
+   4. En el panel, la línea de Vuelos pasa de «(anónimo)» a «(cuenta)» y muestra los créditos que te quedan.
+3. **aisstream.io (barcos de todo el mundo), opcional.**
+   1. Entra en https://aisstream.io y pulsa *Sign In*. Entras con tu cuenta de GitHub.
+   2. Abre **API Keys** y crea una clave nueva.
+   3. En `.env`: `AISSTREAM_API_KEY=<clave>`. Sin ella solo ves barcos del Báltico.
+4. **Ubicación del plano, opcional.** `PLANO_LAT` y `PLANO_LNG` con la esquina suroeste de tu casa. Saca las
+   coordenadas con clic derecho en Google Maps.
+5. **RuView, solo con nodos ESP32.** `RUVIEW_URL=ws://ruview:3001/ws/sensing` y `RUVIEW_API_TOKEN` con un secreto
+   generado en PowerShell: `[guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')`.
+6. **Aplica los cambios.** `docker compose up -d --force-recreate argos` (con RuView, añade `--profile ruview`).
+   Revisa con `docker compose logs -f argos`.
+
+Las cámaras (TfL, NYC DOT, Fintraffic) y Digitraffic no necesitan clave.
+
 ## Configuración opcional (`.env`)
 
 Copia `.env.example` como `.env` (git lo ignora).

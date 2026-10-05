@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Seguridad · AI Trading Lab</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="pagina-seguridad">
+  <div class="shell shell-seguridad">
+    <header class="top glass">
+      <div class="brand">
+        <span class="core" aria-hidden="true"></span>
+        <div>
+          <h1>AI TRADING LAB</h1>
+          <p>Seguridad y mapa táctico · Argos-Atlas</p>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Secciones">
+        <a href="/">Mercado</a>
+        <a href="/seguridad" aria-current="page">Seguridad</a>
+        <a href="/tv">TV</a>
+      </nav>
+      <div class="argos-estado" id="argos-estado">Buscando Argos-Atlas…</div>
+    </header>
+
+    <section class="glass card argos-caido" id="argos-caido" hidden>
+      <h2>Argos-Atlas no está en marcha</h2>
+      <p>El panel intenta arrancarlo solo con Docker al abrirse. Si no aparece en un par de minutos, abre Docker Desktop y,
+        en una terminal dentro de la carpeta <code>argos-atlas</code> del proyecto, ejecuta:</p>
+      <pre id="argos-comando">docker compose up -d --build</pre>
+      <p class="muted">Esta página lo vuelve a comprobar cada 5 segundos y lo muestra en cuanto responde.</p>
+    </section>
+
+    <iframe id="argos" class="argos-frame glass" title="Argos-Atlas: vuelos, barcos, cámaras y plano doméstico" hidden
+            referrerpolicy="no-referrer"></iframe>
+  </div>
+  <script src="/static/seguridad.js"></script>
+</body>
+</html>
