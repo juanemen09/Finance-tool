@@ -12,7 +12,25 @@ const FONDO = '#070b10';
 const CADUCA_MS = 20_000;
 const TAM_PULSO = 44; // px
 
-export function crearCapaPlano(map, renderer, { contador, lista, insignia }) {
+const FUENTES_RUVIEW = {
+  esp32: ['RUVIEW · ESP32', 'ok', 'Lecturas reales de nodos ESP32 (CSI).'],
+  wifi: ['RUVIEW · WI-FI', 'ok', 'Lecturas reales del Wi-Fi del PC (solo RSSI: presencia y movimiento, sin posición).'],
+  simulated: ['RUVIEW · DEMO', 'aviso', 'RuView está en su modo de demostración (CSI sintético): no son personas reales.'],
+};
+
+// Insignia y línea de estado según de dónde vienen las presencias.
+export function describirFuente(modo, sensor) {
+  if (modo === 'simulador') return { texto: 'SIMULADO', tipo: 'aviso', titulo: 'Emulador de Argos-Atlas: no son personas reales.', estado: 'Emulador por software' };
+  if (modo === 'externo') return { texto: 'EXTERNO', tipo: 'aviso', titulo: 'Lecturas publicadas en /ingest/ruview.', estado: 'Esperando lecturas externas' };
+  if (!sensor?.conectado) {
+    return { texto: 'RUVIEW · SIN CONEXIÓN', tipo: 'error', titulo: 'No hay conexión con el sensing-server de RuView.', estado: sensor?.error ?? 'Conectando con RuView…' };
+  }
+  const [texto, tipo, titulo] = FUENTES_RUVIEW[sensor.fuente] ?? [`RUVIEW · ${String(sensor.fuente ?? '…').toUpperCase()}`, 'aviso', 'Fuente de RuView sin clasificar.'];
+  const nodos = sensor.fuente === 'esp32' ? `${sensor.nodos} nodo${sensor.nodos === 1 ? '' : 's'} · ` : '';
+  return { texto, tipo, titulo, estado: `${nodos}${sensor.presencia ? 'presencia detectada' : 'sin presencia'}` };
+}
+
+export function crearCapaPlano(map, renderer, { contador, lista, insignia, estado }) {
   const grupoPlano = L.layerGroup();
   const grupoPresencia = L.layerGroup();
   const objetivos = new Map(); // id -> { fantasma, pulso, datos, t, fila }
@@ -21,6 +39,7 @@ export function crearCapaPlano(map, renderer, { contador, lista, insignia }) {
   let ws = null;
   let espera = 1000;
   let visible = false;
+  let modo = null;
 
   function dibujar() {
     grupoPlano.clearLayers();
@@ -67,7 +86,9 @@ export function crearCapaPlano(map, renderer, { contador, lista, insignia }) {
     const o = { fantasma, pulso, datos: null, t: 0, fila: document.createElement('li') };
     fantasma.bindTooltip(() => {
       const d = o.datos;
-      return `<b>${esc(d.id)}</b><br>${esc(d.room)} · ${esc(d.state)}<br>respiración ${d.resp ?? '—'} rpm`;
+      const extra = d.aprox ? '<br><i>posición aproximada (pico del campo Wi-Fi)</i>' : '';
+      const conf = d.conf != null ? ` · confianza ${Math.round(d.conf * 100)} %` : '';
+      return `<b>${esc(d.id)}</b><br>${esc(d.room)} · ${esc(d.state)}${conf}<br>respiración ${d.resp ?? '—'} rpm${extra}`;
     });
     lista.append(o.fila);
     grupoPresencia.addLayer(fantasma).addLayer(pulso);
@@ -89,15 +110,26 @@ export function crearCapaPlano(map, renderer, { contador, lista, insignia }) {
     contador.textContent = objetivos.size;
   }
 
+  function quitar(id) {
+    const o = objetivos.get(id);
+    if (!o) return;
+    grupoPresencia.removeLayer(o.fantasma).removeLayer(o.pulso);
+    o.fila.remove();
+    objetivos.delete(id);
+  }
+
   function purgar() {
     const limite = Date.now() - CADUCA_MS;
-    for (const [id, o] of objetivos) {
-      if (o.t >= limite) continue;
-      grupoPresencia.removeLayer(o.fantasma).removeLayer(o.pulso);
-      o.fila.remove();
-      objetivos.delete(id);
-    }
+    for (const [id, o] of objetivos) if (o.t < limite) quitar(id);
     contador.textContent = objetivos.size;
+  }
+
+  function mostrarFuente(f) {
+    insignia.textContent = f.texto;
+    insignia.title = f.titulo;
+    insignia.className = `insignia ${f.tipo}`;
+    estado.textContent = f.estado;
+    estado.className = `estado ${f.tipo === 'error' ? 'error' : ''}`;
   }
 
   function conectar() {
@@ -114,15 +146,20 @@ export function crearCapaPlano(map, renderer, { contador, lista, insignia }) {
         return;
       }
       if (d.tipo === 'hola') {
-        const simulado = d.fuente === 'simulador';
-        insignia.textContent = simulado ? 'SIMULADO' : 'RUVIEW';
-        insignia.title = simulado ? 'Datos del emulador por software: no son personas reales.' : 'Lecturas de un sensor RuView.';
-        return;
+        modo = d.modo;
+        mostrarFuente(describirFuente(modo, d.sensor));
+      } else if (d.tipo === 'sensor') {
+        mostrarFuente(describirFuente(modo, d.sensor));
+      } else if (d.tipo === 'baja') {
+        quitar(d.id);
+        contador.textContent = objetivos.size;
+      } else if (d.id && Array.isArray(d.coords)) {
+        actualizar(d);
       }
-      if (d.id && Array.isArray(d.coords)) actualizar(d);
     };
     ws.onclose = () => {
       ws = null;
+      mostrarFuente({ texto: 'SIN PROXY', tipo: 'error', titulo: 'Se perdió la conexión con el proxy de Argos-Atlas.', estado: 'Reconectando con el proxy…' });
       setTimeout(conectar, espera);
       espera = Math.min(espera * 2, 30_000);
     };

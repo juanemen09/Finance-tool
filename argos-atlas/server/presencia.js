@@ -16,5 +16,7 @@ export function normalizarLectura(texto) {
     coords: [lat, lng],
     state: m.state === 'movimiento' ? 'movimiento' : 'quieto',
     resp: Number.isFinite(m.resp) ? Math.round(m.resp) : null,
+    ...(m.aprox === true ? { aprox: true } : {}),
+    ...(Number.isFinite(m.conf) ? { conf: Math.min(Math.max(m.conf, 0), 1) } : {}),
   });
 }

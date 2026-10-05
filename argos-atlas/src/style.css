@@ -31,6 +31,18 @@
   .estado.aviso {
     @apply text-ambar;
   }
+  .insignia {
+    @apply rounded border px-1.5 py-0.5 text-[10px] tracking-widest;
+  }
+  .insignia.ok {
+    @apply border-neon/60 text-neon;
+  }
+  .insignia.aviso {
+    @apply border-ambar/60 text-ambar;
+  }
+  .insignia.error {
+    @apply border-red-400/60 text-red-400;
+  }
   .interruptor {
     @apply relative h-4 w-8 shrink-0 cursor-pointer appearance-none rounded-full bg-slate-700 transition-colors checked:bg-neon/70;
   }

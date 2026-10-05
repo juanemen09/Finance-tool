@@ -54,7 +54,12 @@ const capas = {
   vuelos: crearCapaVuelos(map, renderer, { contador: $('n-vuelos'), estado: $('e-vuelos') }),
   barcos: crearCapaBarcos(map, renderer, { contador: $('n-barcos'), estado: $('e-barcos') }),
   camaras: crearCapaCamaras(map, renderer, { contador: $('n-camaras'), estado: $('e-camaras') }),
-  plano: crearCapaPlano(map, renderer, { contador: $('n-presencia'), lista: $('lista-presencia'), insignia: $('fuente-presencia') }),
+  plano: crearCapaPlano(map, renderer, {
+    contador: $('n-presencia'),
+    lista: $('lista-presencia'),
+    insignia: $('fuente-presencia'),
+    estado: $('e-presencia'),
+  }),
 };
 
 await capas.plano.iniciar().catch((e) => {

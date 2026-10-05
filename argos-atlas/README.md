@@ -1,28 +1,78 @@
 # Argos-Atlas
 
 Mapa táctico local para la seguridad de casa y oficina. Muestra **vuelos, barcos y cámaras públicas en tiempo real**,
-con datos reales de APIs abiertas, y un **plano 2D del hogar** con las presencias que detectaría un sensor RuView.
-Ahora mismo esas presencias salen de un emulador, y la interfaz lo marca como `SIMULADO`.
+con datos reales de APIs abiertas, y un **plano 2D del hogar** con las presencias que detecta
+[RuView](https://github.com/ruvnet/RuView) (Wi-Fi como sensor, sin cámaras).
 
 Es una herramienta aparte del AI Trading Lab: no lee ni escribe el diario y no es una señal de trading.
 
-## Arranque (Windows, macOS o Linux)
+## Arranque con Docker (recomendado)
 
-Necesitas Node.js 20 o superior.
+Con Docker Desktop abierto, en una terminal dentro de `argos-atlas/`:
 
-```bash
-cd argos-atlas
-npm install
-npm run dev
+```powershell
+copy .env.example .env        # una vez; luego edita .env (todo es opcional)
+docker compose up -d --build
 ```
 
-Abre `http://127.0.0.1:5173`. `npm run dev` levanta el proxy (`http://127.0.0.1:8787`), que arranca el emulador
-de RuView en segundo plano, y el servidor de Vite. Ctrl+C cierra los tres.
+Abre `http://127.0.0.1:8787`. Vuelos, barcos y cámaras salen de las APIs reales desde el primer momento. El
+puerto solo se publica en `127.0.0.1`: nadie de tu red puede abrirlo.
 
-- `npm start` compila la app y la sirve desde el proxy en `http://127.0.0.1:8787`, sin Vite.
-- `npm test` corre las pruebas.
+- Ver lo que pasa: `docker compose logs -f argos`
+- Parar: `docker compose down`
+- Actualizar tras un `git pull`: `docker compose up -d --build`
 
-Todo escucha solo en `127.0.0.1`: nadie de tu red puede abrirlo.
+### Con RuView real (nodos ESP32)
+
+1. Flashea y configura tus ESP32-S3 con el firmware de RuView (su README, «Option 2a»), apuntando `--target-ip` a la IP
+   de este PC.
+2. En `.env`:
+   ```
+   RUVIEW_URL=ws://ruview:3001/ws/sensing
+   RUVIEW_API_TOKEN=<un secreto largo>
+   CSI_SOURCE=esp32
+   ```
+3. `docker compose --profile ruview up -d --build`
+
+Eso levanta además el servidor oficial de RuView (`ruvnet/wifi-densepose`): recibe las tramas CSI por UDP 5005 y su
+propia interfaz queda en `http://127.0.0.1:3000`. Argos-Atlas se conecta a su WebSocket con el token, apaga el
+emulador y la insignia pasa a **RUVIEW · ESP32** con el número de nodos.
+
+En Docker Desktop para Windows, varios ESP32 llegan como uno solo por UDP. RuView documenta el arreglo: cambiar el
+puerto a `5006:5005/udp` y correr su `scripts/udp-relay.py`. Con un solo nodo no hace falta.
+
+### Sin hardware: Wi-Fi del PC (solo Windows, solo RSSI)
+
+RuView puede usar la tarjeta Wi-Fi del PC con `netsh` (presencia y movimiento, sin posición). Eso no funciona dentro
+de Docker: hay que compilar su `sensing-server` en Windows (Rust) y correrlo como administrador:
+
+```powershell
+git clone --recursive https://github.com/ruvnet/RuView; cd RuView\v2
+cargo build --release -p wifi-densepose-sensing-server
+.\target\release\sensing-server.exe --source wifi --http-port 3000 --ws-port 3001 --tick-ms 500
+```
+
+Después corre Argos-Atlas con Node (no en Docker) y `RUVIEW_URL=ws://127.0.0.1:3001/ws/sensing` en `.env`. La presencia
+aparece en la zona del sensor, porque RSSI no da posición.
+
+### Qué dice la insignia del plano
+
+| Insignia | Significado |
+|---|---|
+| `RUVIEW · ESP32` | Lecturas reales de tus nodos. |
+| `RUVIEW · WI-FI` | Lecturas reales del Wi-Fi del PC (solo presencia y movimiento). |
+| `RUVIEW · DEMO` | RuView corre con `CSI_SOURCE=simulated`: no son personas reales. |
+| `RUVIEW · SIN CONEXIÓN` | Argos no llega a RuView. La línea de debajo dice por qué (token, host o servidor apagado). |
+| `SIMULADO` | No hay `RUVIEW_URL`: es el emulador de Argos-Atlas. |
+
+La posición viene del pico del campo de señal que calcula RuView. El propio RuView avisa de que es aproximada y no una
+triangulación, y el mapa la marca así. Para alinearla con tu plano usa `RUVIEW_ORIGEN_X`, `RUVIEW_ORIGEN_Y`,
+`RUVIEW_GIRO` y `RUVIEW_ESCALA`.
+
+## Arranque sin Docker
+
+Necesitas Node.js 20 o superior: `npm install` y luego `npm run dev`, y abre `http://127.0.0.1:5173`. `npm start`
+compila y sirve todo en `:8787`. `npm test` corre las pruebas.
 
 ## Configuración opcional (`.env`)
 
@@ -33,8 +83,10 @@ Copia `.env.example` como `.env` (git lo ignora).
 | `OPENSKY_CLIENT_ID`, `OPENSKY_CLIENT_SECRET` | Cuenta gratuita de OpenSky. En modo anónimo el cupo diario se agota en poco más de una hora de uso continuo; con cuenta es unas 10 veces mayor. |
 | `AISSTREAM_API_KEY` | Barcos de todo el mundo vía aisstream.io (clave gratuita). Sin ella solo se ven los del Báltico (Digitraffic). |
 | `PLANO_LAT`, `PLANO_LNG` | Esquina suroeste del plano doméstico. Tu dirección queda solo en `.env`, nunca en el repo. |
-| `RUVIEW_SIMULADOR` | `1` (por defecto) arranca el emulador; `0` lo apaga, a la espera de un RuView real. |
-| `ARGOS_INGEST_TOKEN` | Token fijo para que un adaptador de RuView real publique lecturas (ver más abajo). |
+| `RUVIEW_URL`, `RUVIEW_API_TOKEN` | WebSocket y token del sensing-server de RuView. Con ellos, presencia real. |
+| `CSI_SOURCE` | Para el contenedor de RuView: `esp32` (real) o `simulated` (su demo). |
+| `RUVIEW_ORIGEN_X/Y`, `RUVIEW_GIRO`, `RUVIEW_ESCALA` | Calibración de la sala de RuView sobre el plano. |
+| `RUVIEW_SIMULADOR` | Solo sin `RUVIEW_URL`: `1` arranca el emulador; `0` espera lecturas en `/ingest/ruview`. |
 
 ## Fuentes de datos
 
@@ -67,30 +119,22 @@ enlaces muertos. El catálogo se renueva cada 6 h. Madrid todavía no está: se 
   `<video>` y su temporizador.
 - **Pestaña oculta:** se detienen los sondeos y la red queda en reposo.
 
-## Plano doméstico y RuView
+## Plano doméstico
 
 `shared/plano.js` define las habitaciones (Sala, Pasillo, Cocina y Habitación Principal), las puertas y el sensor, en
 metros. Para que coincida con tu casa, edita esos rectángulos y pon tu origen en `.env`.
 
-`simulador_ruview.js` emula la telemetría de presencia por Wi-Fi (CSI). Cada 2 s envía por WebSocket un JSON por
-objetivo:
+Cada presencia llega al navegador con este formato. Viene de RuView (`server/ruview.js`) o del emulador
+(`simulador_ruview.js`):
 
 ```json
-{ "id": "target_01", "room": "Sala", "coords": [-0.18061, -78.48522], "state": "movimiento", "resp": 15 }
+{ "id": "persona_1", "room": "Sala", "coords": [-0.18061, -78.48522], "state": "movimiento", "resp": 15, "aprox": true, "conf": 0.82 }
 ```
 
-La trayectoria es una caminata aleatoria que solo cambia de habitación cruzando las puertas. Las pruebas comprueban que
-nunca sale del plano.
-
-**Pasar a un RuView real.** [RuView](https://github.com/ruvnet/RuView) (MIT) necesita nodos ESP32-S3 (unos 9 USD cada
-uno). Expone REST, WebSocket y MQTT. Para conectarlo:
-
-1. Pon `RUVIEW_SIMULADOR=0` y un `ARGOS_INGEST_TOKEN` en `.env`.
-2. Escribe un adaptador que traduzca su salida al JSON de arriba y lo publique en
-   `ws://127.0.0.1:8787/ingest/ruview?token=TU_TOKEN`.
-
-El proxy valida cada lectura antes de reenviarla al mapa. Ten en cuenta que el propio RuView publica una precisión de
-presencia del 82 % y marca sus signos vitales como no validados: úsalo como aviso, no como alarma definitiva.
+El adaptador lee los `sensing_update` de RuView (10 por segundo) y procesa uno por segundo. Si alguien se va o se corta
+la conexión, quita su marcador. La respiración solo se muestra cuando RuView da una confianza de al menos 0,3. RuView
+publica una precisión de presencia del 82 % y marca sus signos vitales como no validados: úsalo como aviso, no como
+alarma definitiva.
 
 ## Uso responsable
 

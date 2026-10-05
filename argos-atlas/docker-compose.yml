@@ -1,0 +1,51 @@
+# Argos-Atlas con datos reales.
+#   docker compose up -d --build                    → mapa con vuelos, barcos y cámaras reales
+#   docker compose --profile ruview up -d --build   → además, el sensing-server real de RuView (nodos ESP32)
+# La configuración va en .env (copia .env.example). Abre http://127.0.0.1:8787
+name: argos-atlas
+
+services:
+  argos:
+    build: .
+    image: argos-atlas:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8787:8787" # solo este PC
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      HOST: 0.0.0.0
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+
+  # Servidor oficial de RuView (https://github.com/ruvnet/RuView, MIT). Recibe las tramas CSI de los ESP32 por UDP
+  # y las publica en ws://ruview:3001/ws/sensing, que Argos-Atlas lee con RUVIEW_URL.
+  ruview:
+    profiles: ["ruview"]
+    image: ruvnet/wifi-densepose:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000" # interfaz propia de RuView
+      - "5005:5005/udp" # tramas CSI de los ESP32 de tu red
+    environment:
+      CSI_SOURCE: ${CSI_SOURCE:-esp32} # esp32 = real; simulated = su demo (Argos lo marca como DEMO)
+      RUVIEW_API_TOKEN: ${RUVIEW_API_TOKEN:-} # obligatorio: sin token RuView se niega a arrancar
+      SENSING_ALLOWED_HOSTS: ruview # Argos se conecta por el nombre del servicio
+      RUST_LOG: info
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G

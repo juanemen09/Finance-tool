@@ -1,5 +1,7 @@
 // Argos-Atlas: proxy local (evita CORS) y concentrador de WebSockets de presencia.
-// Escucha solo en 127.0.0.1. Arranca el emulador de RuView en segundo plano salvo que RUVIEW_SIMULADOR=0.
+// Escucha en 127.0.0.1 (en Docker, HOST=0.0.0.0 dentro del contenedor y el puerto se publica solo en 127.0.0.1).
+// Presencia: con RUVIEW_URL se conecta al sensing-server real de RuView; sin él arranca el emulador, salvo
+// RUVIEW_SIMULADOR=0 (entonces espera lecturas externas en /ingest/ruview).
 
 import { fork } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -23,11 +25,14 @@ const { barcosEn, estadoAis } = await import('./server/ais.js');
 const { camarasEn, estadoCamaras } = await import('./server/camaras.js');
 const { leerBbox } = await import('./server/util.js');
 const { normalizarLectura } = await import('./server/presencia.js');
+const { iniciarRuView } = await import('./server/ruview.js');
 const { ORIGEN_POR_DEFECTO } = await import('./shared/plano.js');
 
-const HOST = '127.0.0.1';
+const HOST = process.env.HOST || '127.0.0.1';
 const PORT = Number(process.env.PORT) || 8787;
-const SIMULADOR = process.env.RUVIEW_SIMULADOR !== '0';
+const RUVIEW_URL = process.env.RUVIEW_URL || '';
+const MODO = RUVIEW_URL ? 'ruview' : process.env.RUVIEW_SIMULADOR !== '0' ? 'simulador' : 'externo';
+const SIMULADOR = MODO === 'simulador';
 // Un adaptador de RuView real puede publicar en /ingest/ruview si conoce este token (ARGOS_INGEST_TOKEN en .env).
 const TOKEN_INGESTA = process.env.ARGOS_INGEST_TOKEN || randomBytes(16).toString('hex');
 
@@ -55,15 +60,23 @@ app.get('/api/vuelos/meta/:icao24', async (req, res) => {
   res.json(await metadatosAvion(icao));
 });
 
-app.get('/api/plano', (_req, res) => {
+function origenPlano() {
   const lat = Number.parseFloat(process.env.PLANO_LAT);
   const lng = Number.parseFloat(process.env.PLANO_LNG);
-  const origen = Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : ORIGEN_POR_DEFECTO;
-  res.json({ origen, fuente: SIMULADOR ? 'simulador' : 'ruview' });
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : ORIGEN_POR_DEFECTO;
+}
+
+app.get('/api/plano', (_req, res) => {
+  res.json({ origen: origenPlano(), modo: MODO });
 });
 
 app.get('/api/estado', (_req, res) => {
-  res.json({ opensky: estadoOpenSky(), ais: estadoAis(), camaras: estadoCamaras(), presencia: { fuente: SIMULADOR ? 'simulador' : 'ruview', objetivos: ultimos.size } });
+  res.json({
+    opensky: estadoOpenSky(),
+    ais: estadoAis(),
+    camaras: estadoCamaras(),
+    presencia: { modo: MODO, sensor: estadoSensor, objetivos: ultimos.size },
+  });
 });
 
 const DIST = join(RAIZ, 'dist');
@@ -81,6 +94,27 @@ const wssNavegador = new WebSocketServer({ noServer: true, maxPayload: 4096 });
 const wssIngesta = new WebSocketServer({ noServer: true, maxPayload: 4096 });
 const ultimos = new Map(); // id -> { t, texto }
 const OBJETIVO_CADUCA_MS = 20_000;
+let estadoSensor = null; // solo con RuView real: conexión, fuente (esp32/wifi/simulated), nodos
+
+function difundir(texto) {
+  for (const cliente of wssNavegador.clients) {
+    // Un navegador lento no acumula memoria en el servidor: si tiene cola, se salta este tick.
+    if (cliente.readyState === WebSocket.OPEN && cliente.bufferedAmount < 64 * 1024) cliente.send(texto);
+  }
+}
+
+function publicarLectura(bruto) {
+  const texto = normalizarLectura(bruto);
+  if (!texto) return;
+  ultimos.set(JSON.parse(texto).id, { t: Date.now(), texto });
+  difundir(texto);
+}
+
+function bajaObjetivo(id) {
+  if (ultimos.delete(id)) difundir(JSON.stringify({ tipo: 'baja', id }));
+}
+
+const mensajeHola = () => JSON.stringify({ tipo: 'hola', modo: MODO, sensor: estadoSensor });
 
 servidor.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, `http://${HOST}`);
@@ -94,16 +128,7 @@ servidor.on('upgrade', (req, socket, head) => {
 });
 
 wssIngesta.on('connection', (ws) => {
-  ws.on('message', (raw) => {
-    const texto = normalizarLectura(raw.toString());
-    if (!texto) return;
-    const id = JSON.parse(texto).id;
-    ultimos.set(id, { t: Date.now(), texto });
-    for (const cliente of wssNavegador.clients) {
-      // Un navegador lento no acumula memoria en el servidor: si tiene cola, se salta este tick.
-      if (cliente.readyState === WebSocket.OPEN && cliente.bufferedAmount < 64 * 1024) cliente.send(texto);
-    }
-  });
+  ws.on('message', (raw) => publicarLectura(raw.toString()));
 });
 
 wssNavegador.on('connection', (ws) => {
@@ -111,7 +136,7 @@ wssNavegador.on('connection', (ws) => {
   ws.on('pong', () => {
     ws.vivo = true;
   });
-  ws.send(JSON.stringify({ tipo: 'hola', fuente: SIMULADOR ? 'simulador' : 'ruview' }));
+  ws.send(mensajeHola());
   const limite = Date.now() - OBJETIVO_CADUCA_MS;
   for (const { t, texto } of ultimos.values()) if (t > limite) ws.send(texto);
 });
@@ -130,6 +155,7 @@ setInterval(() => {
 
 // --- Emulador de RuView en segundo plano -----------------------------------------------------------------------
 let simulador = null;
+let ruview = null;
 let cerrando = false;
 
 function arrancarSimulador(espera = 1000) {
@@ -151,6 +177,7 @@ function arrancarSimulador(espera = 1000) {
 function cerrar() {
   cerrando = true;
   simulador?.kill('SIGTERM');
+  ruview?.cerrar();
   servidor.close();
   process.exit(0);
 }
@@ -162,5 +189,24 @@ servidor.listen(PORT, HOST, () => {
   if (SIMULADOR) {
     arrancarSimulador();
     console.log('[argos-atlas] emulador de RuView activo (datos SIMULADOS)');
+  } else if (MODO === 'ruview') {
+    ruview = iniciarRuView({
+      url: RUVIEW_URL,
+      token: process.env.RUVIEW_API_TOKEN || '',
+      origen: origenPlano(),
+      publicar: publicarLectura,
+      baja: bajaObjetivo,
+      estado: (info) => {
+        const antes = estadoSensor;
+        estadoSensor = info;
+        if (antes?.conectado !== info.conectado || antes?.error !== info.error) {
+          console.log(`[ruview] ${info.conectado ? `conectado (${info.fuente ?? 'sin datos aún'})` : `desconectado${info.error ? `: ${info.error}` : ''}`}`);
+        }
+        difundir(JSON.stringify({ tipo: 'sensor', sensor: info }));
+      },
+    });
+    console.log(`[argos-atlas] presencia desde RuView real: ${RUVIEW_URL}`);
+  } else {
+    console.log('[argos-atlas] presencia: esperando lecturas en /ingest/ruview');
   }
 });

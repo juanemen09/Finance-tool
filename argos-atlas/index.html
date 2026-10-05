@@ -44,9 +44,10 @@
             <input type="checkbox" id="t-plano" class="interruptor" checked />
           </label>
           <div class="flex items-center justify-between">
-            <span id="fuente-presencia" class="rounded border border-ambar/60 px-1.5 py-0.5 text-[10px] tracking-widest text-ambar">SIMULADO</span>
+            <span id="fuente-presencia" class="insignia aviso">…</span>
             <button id="ir-plano" class="rounded border border-neon/40 px-2 py-1 text-xs text-neon hover:bg-neon/10">Ir al plano ⌖</button>
           </div>
+          <p id="e-presencia" class="estado"></p>
           <div class="flex items-center justify-between text-sm">
             <span>Presencias</span><b id="n-presencia" class="contador">0</b>
           </div>
@@ -55,7 +56,7 @@
 
         <footer class="mt-auto text-[10px] leading-snug text-slate-500">
           Datos: OpenSky Network, Digitraffic/Fintraffic (CC BY 4.0), aisstream.io, Transport for London, NYC DOT. Mapa ©
-          OpenStreetMap, © CARTO. La presencia doméstica es simulada hasta conectar un sensor RuView.
+          OpenStreetMap, © CARTO. Presencia doméstica: RuView (ESP32 o Wi-Fi) o su emulador, según la insignia.
         </footer>
       </aside>
 
