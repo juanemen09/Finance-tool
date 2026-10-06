@@ -7,7 +7,7 @@ import { fork } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
@@ -91,7 +91,19 @@ app.get('/api/estado', (_req, res) => {
 });
 
 const DIST = join(RAIZ, 'dist');
-if (existsSync(DIST)) app.use(express.static(DIST, { maxAge: '1h' }));
+// La página (index.html) nunca se guarda en caché: tras una actualización pediría archivos con nombres que ya no
+// existen y se vería sin estilos ni mapa. Los archivos de /assets llevan un hash en el nombre y sí se guardan.
+if (existsSync(DIST)) {
+  app.use(
+    express.static(DIST, {
+      cacheControl: false,
+      setHeaders(res, ruta) {
+        const inmutable = ruta.includes(`${sep}assets${sep}`);
+        res.setHeader('Cache-Control', inmutable ? 'public, max-age=31536000, immutable' : 'no-cache');
+      },
+    }),
+  );
+}
 
 app.use((err, _req, res, _next) => {
   const status = err.status ?? 500;

@@ -25,7 +25,8 @@
       r = null;
     }
     const ok = Boolean(r && r.ok);
-    if (ok && !marco.src) marco.src = `${r.url}/`;
+    // ?v= evita que el navegador muestre una versión guardada de Argos tras actualizarlo.
+    if (ok && !marco.src) marco.src = `${r.url}/?v=${Date.now()}`;
     marco.hidden = !ok;
     caido.hidden = ok;
     if (r && r.arranque) comando.textContent = r.arranque;
