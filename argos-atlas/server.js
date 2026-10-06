@@ -23,6 +23,8 @@ try {
 const { vuelosEn, metadatosAvion, estadoOpenSky } = await import('./server/opensky.js');
 const { barcosEn, estadoAis } = await import('./server/ais.js');
 const { camarasEn, estadoCamaras } = await import('./server/camaras.js');
+const { detalleWindy } = await import('./server/windy.js');
+const { conflictosEn, estadoConflictos, iniciarConflictos } = await import('./server/conflictos.js');
 const { leerBbox } = await import('./server/util.js');
 const { normalizarLectura } = await import('./server/presencia.js');
 const { iniciarRuView } = await import('./server/ruview.js');
@@ -50,7 +52,7 @@ const conBbox = (fn) => async (req, res, next) => {
   const bbox = leerBbox(req.query);
   if (!bbox) return res.status(400).json({ error: 'faltan lamin, lomin, lamax, lomax válidos' });
   try {
-    res.json(await fn(bbox));
+    res.json(await fn(bbox, req));
   } catch (e) {
     next(e);
   }
@@ -59,6 +61,20 @@ const conBbox = (fn) => async (req, res, next) => {
 app.get('/api/vuelos', conBbox(async (b) => ({ ...(await vuelosEn(b)), estado: estadoOpenSky() })));
 app.get('/api/barcos', conBbox(async (b) => ({ ...(await barcosEn(b)), estado: estadoAis() })));
 app.get('/api/camaras', conBbox(async (b) => ({ ...(await camarasEn(b)), estado: estadoCamaras() })));
+
+app.get(
+  '/api/conflictos',
+  conBbox(async (b, req) => ({ ...conflictosEn(b, Number(req.query.h) || 24), estado: estadoConflictos() })),
+);
+
+app.get('/api/camaras/windy/:id', async (req, res, next) => {
+  if (!/^\d{1,12}$/.test(req.params.id)) return res.status(400).json({ error: 'id inválido' });
+  try {
+    res.json(await detalleWindy(req.params.id));
+  } catch (e) {
+    next(e);
+  }
+});
 
 app.get('/api/vuelos/meta/:icao24', async (req, res) => {
   const icao = String(req.params.icao24).toLowerCase();
@@ -86,6 +102,7 @@ app.get('/api/estado', (_req, res) => {
     opensky: estadoOpenSky(),
     ais: estadoAis(),
     camaras: estadoCamaras(),
+    conflictos: estadoConflictos(),
     presencia: { modo: MODO, sensor: estadoSensor, objetivos: ultimos.size },
   });
 });
@@ -208,6 +225,7 @@ process.on('SIGINT', cerrar);
 process.on('SIGTERM', cerrar);
 
 servidor.listen(PORT, HOST, () => {
+  iniciarConflictos();
   console.log(`[argos-atlas] proxy en http://${HOST}:${PORT}${existsSync(DIST) ? ' (sirve la app compilada)' : ''}`);
   if (SIMULADOR) {
     arrancarSimulador();

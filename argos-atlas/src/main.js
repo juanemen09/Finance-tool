@@ -3,6 +3,7 @@ import './style.css';
 import L from 'leaflet';
 import { crearCapaBarcos } from './capas/barcos.js';
 import { crearCapaCamaras } from './capas/camaras.js';
+import { crearCapaConflictos } from './capas/conflictos.js';
 import { crearCapaPlano } from './capas/plano.js';
 import { crearCapaVuelos } from './capas/vuelos.js';
 import { ponerMapaBase } from './mapaBase.js';
@@ -56,6 +57,7 @@ const capas = {
   vuelos: crearCapaVuelos(map, renderer, { contador: $('n-vuelos'), estado: $('e-vuelos') }),
   barcos: crearCapaBarcos(map, renderer, { contador: $('n-barcos'), estado: $('e-barcos') }),
   camaras: crearCapaCamaras(map, renderer, { contador: $('n-camaras'), estado: $('e-camaras') }),
+  conflictos: crearCapaConflictos(map, renderer, { contador: $('n-conflictos'), estado: $('e-conflictos') }),
   plano: crearCapaPlano(map, renderer, {
     contador: $('n-presencia'),
     lista: $('lista-presencia'),

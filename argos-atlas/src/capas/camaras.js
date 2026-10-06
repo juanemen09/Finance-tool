@@ -6,7 +6,9 @@ import { crearSondeo } from '../sondeo.js';
 import { hora, ponerEstado } from '../util.js';
 
 const COLOR = '#f472b6';
+const COLOR_WINDY = '#c084fc'; // cámaras de Windy (todo el mundo), en violeta para distinguirlas
 const REFRESCO_IMAGEN_MS = 10_000;
+const REFRESCO_WINDY_MS = 3 * 60_000; // la URL de Windy lleva un token: se pide una nueva en vez de recargar
 
 export function crearCapaCamaras(map, renderer, { contador, estado }) {
   const grupo = L.featureGroup();
@@ -16,6 +18,7 @@ export function crearCapaCamaras(map, renderer, { contador, estado }) {
   const fuente = document.getElementById('cam-fuente');
   const horaEl = document.getElementById('cam-hora');
   const botonVideo = document.getElementById('cam-video');
+  const enlace = document.getElementById('cam-enlace');
   let refresco = null;
   let camaraAbierta = null;
 
@@ -38,8 +41,7 @@ export function crearCapaCamaras(map, renderer, { contador, estado }) {
     cuerpo.replaceChildren();
   }
 
-  function mostrarImagen(c) {
-    vaciarCuerpo();
+  function crearImagen(c, aviso) {
     const img = document.createElement('img');
     img.className = 'max-h-[70dvh] w-full object-contain';
     img.alt = c[1];
@@ -48,13 +50,46 @@ export function crearCapaCamaras(map, renderer, { contador, estado }) {
       horaEl.textContent = 'la cámara no devolvió imagen (puede estar fuera de servicio)';
     };
     img.onload = () => {
-      horaEl.textContent = `imagen recibida ${hora()} · se renueva cada ${REFRESCO_IMAGEN_MS / 1000} s`;
+      horaEl.textContent = `imagen recibida ${hora()} · ${aviso}`;
     };
-    img.src = conMarca(c[5]);
     cuerpo.append(img);
+    return img;
+  }
+
+  function mostrarImagen(c) {
+    vaciarCuerpo();
+    const img = crearImagen(c, `se renueva cada ${REFRESCO_IMAGEN_MS / 1000} s`);
+    img.src = conMarca(c[5]);
     refresco = setInterval(() => {
       if (!document.hidden) img.src = conMarca(c[5]);
     }, REFRESCO_IMAGEN_MS);
+  }
+
+  // Windy: la imagen se pide al abrir (sus URL caducan) y se vuelve a pedir cada pocos minutos mientras esté abierta.
+  async function mostrarWindy(c) {
+    vaciarCuerpo();
+    const id = c[0].slice('windy:'.length);
+    horaEl.textContent = 'pidiendo la imagen a Windy…';
+    const img = crearImagen(c, 'Windy la actualiza cada pocos minutos');
+    const cargar = async () => {
+      try {
+        const r = await fetch(`/api/camaras/windy/${encodeURIComponent(id)}`);
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+        if (camaraAbierta !== c) return;
+        if (d.imagen) img.src = d.imagen;
+        else horaEl.textContent = 'esta cámara no tiene imagen ahora';
+        enlace.href = d.enlace;
+        enlace.classList.remove('hidden');
+      } catch (e) {
+        if (camaraAbierta === c) horaEl.textContent = `no se pudo pedir la imagen: ${e.message}`;
+      }
+    };
+    await cargar();
+    if (camaraAbierta !== c) return; // se cerró mientras llegaba la imagen: no dejar un temporizador colgado
+    refresco = setInterval(() => {
+      if (!document.hidden) cargar();
+    }, REFRESCO_WINDY_MS);
   }
 
   function mostrarVideo(c) {
@@ -75,7 +110,9 @@ export function crearCapaCamaras(map, renderer, { contador, estado }) {
     fuente.textContent = `${c[4]} · ${c[2].toFixed(4)}, ${c[3].toFixed(4)}`;
     botonVideo.classList.toggle('hidden', !c[6]);
     botonVideo.textContent = 'Ver clip de vídeo';
-    mostrarImagen(c);
+    enlace.classList.add('hidden');
+    if (c[0].startsWith('windy:')) mostrarWindy(c);
+    else mostrarImagen(c);
     modal.classList.replace('hidden', 'flex');
   }
 
@@ -111,13 +148,15 @@ export function crearCapaCamaras(map, renderer, { contador, estado }) {
     alRecibir({ camaras, total, estado: est }) {
       grupo.clearLayers();
       for (const c of camaras) {
-        const m = L.circleMarker([c[2], c[3]], { renderer, radius: 4, weight: 1, color: COLOR, fillColor: COLOR, fillOpacity: 0.7 });
+        const color = c[4] === 'Windy' ? COLOR_WINDY : COLOR;
+        const m = L.circleMarker([c[2], c[3]], { renderer, radius: 4, weight: 1, color, fillColor: color, fillOpacity: 0.7 });
         m.datos = c;
         grupo.addLayer(m);
       }
       contador.textContent = camaras.length;
       const fallos = Object.entries(est ?? {}).filter(([, v]) => String(v).startsWith('error'));
-      const texto = `${total} en catálogo · ${hora()}${fallos.length ? ` · sin respuesta: ${fallos.map(([k]) => k).join(', ')}` : ''}`;
+      const windy = est?.Windy === 'sin clave' ? ' · Windy: sin clave (solo 3 países)' : '';
+      const texto = `${total} en catálogo · ${hora()}${windy}${fallos.length ? ` · sin respuesta: ${fallos.map(([k]) => k).join(', ')}` : ''}`;
       ponerEstado(estado, texto, fallos.length ? 'aviso' : '');
       estado.title = fallos.map(([k, v]) => `${k}: ${v}`).join('\n'); // el detalle del fallo, al pasar el ratón
     },

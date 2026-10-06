@@ -1,5 +1,7 @@
 .env
 .env.*
+# Las plantillas sin secretos sí se suben (p. ej. argos-atlas/.env.example).
+!.env.example
 *.cred
 __pycache__/
 data/raw/

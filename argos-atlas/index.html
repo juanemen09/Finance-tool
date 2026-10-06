@@ -33,7 +33,13 @@
             <span class="flex items-center gap-2"><i class="punto bg-magenta"></i>Cámaras</span>
             <span class="flex items-center gap-3"><b id="n-camaras" class="contador">—</b><input type="checkbox" id="t-camaras" class="interruptor" checked /></span>
           </label>
-          <p id="e-camaras" class="estado">TfL · NYC DOT · Fintraffic</p>
+          <p id="e-camaras" class="estado">Windy (mundo) · TfL · NYC DOT · Fintraffic</p>
+
+          <label class="fila-capa">
+            <span class="flex items-center gap-2"><i class="punto bg-red-500"></i>Conflictos</span>
+            <span class="flex items-center gap-3"><b id="n-conflictos" class="contador">—</b><input type="checkbox" id="t-conflictos" class="interruptor" checked /></span>
+          </label>
+          <p id="e-conflictos" class="estado">GDELT · últimas 24 h</p>
           <p class="text-[10px] leading-snug text-slate-500">Solo se piden los objetivos dentro de la vista actual.</p>
         </section>
 
@@ -58,7 +64,7 @@
         </section>
 
         <footer class="mt-auto text-[10px] leading-snug text-slate-500">
-          Datos: OpenSky Network, Digitraffic/Fintraffic (CC BY 4.0), aisstream.io, Transport for London, NYC DOT. Mapa ©
+          Datos: OpenSky Network, Digitraffic/Fintraffic (CC BY 4.0), aisstream.io, Transport for London, NYC DOT, <a class="underline" href="https://www.windy.com/webcams" target="_blank" rel="noopener noreferrer">Webcams provided by Windy.com</a>, GDELT Project. Mapa ©
           OpenStreetMap, Esri o CARTO. Presencia doméstica: RuView (ESP32 o Wi-Fi) o su emulador, según la insignia.
         </footer>
       </aside>
@@ -78,7 +84,10 @@
         <div id="cam-cuerpo" class="flex min-h-48 items-center justify-center bg-black"></div>
         <div class="flex items-center justify-between text-[11px] text-slate-400">
           <span id="cam-hora"></span>
-          <button id="cam-video" class="hidden rounded border border-magenta/40 px-2 py-0.5 text-magenta hover:bg-magenta/10">Ver clip de vídeo</button>
+          <span class="flex items-center gap-2">
+            <a id="cam-enlace" class="hidden text-magenta underline" target="_blank" rel="noopener noreferrer">Webcams provided by Windy.com</a>
+            <button id="cam-video" class="hidden rounded border border-magenta/40 px-2 py-0.5 text-magenta hover:bg-magenta/10">Ver clip de vídeo</button>
+          </span>
         </div>
       </div>
     </div>

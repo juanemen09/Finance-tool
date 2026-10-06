@@ -6,13 +6,15 @@
 // El servidor solo entrega coordenadas y URLs: las imágenes las pide el navegador al abrir cada cámara.
 
 import { Cache, ErrorFuente, dentro, pedirJson } from './util.js';
+import { camarasWindyEn, estadoWindy } from './windy.js';
 
 // Catálogo completo: 6 h. Si alguna fuente falló, se reintenta a los 5 min en vez de esperar 6 h sin ella.
 const cache = new Cache({ ttlMs: 6 * 3600_000, max: 1, ttlDe: (c) => (c.parcial ? 5 * 60_000 : 6 * 3600_000) });
 const estado = {};
 
 export function estadoCamaras() {
-  return { ...estado };
+  const w = estadoWindy();
+  return { ...estado, Windy: w.activo ? (w.error ? `error: ${w.error}` : 'activo') : 'sin clave' };
 }
 
 // Vector compacto: [id, nombre, lat, lon, fuente, url_imagen, url_video|null]
@@ -66,7 +68,15 @@ async function catalogo() {
   });
 }
 
+// Catálogos fijos (TfL, NYC, Fintraffic) más las de Windy en la zona visible, de todo el mundo.
 export async function camarasEn(bbox) {
-  const { todas } = await catalogo();
-  return { camaras: todas.filter((c) => dentro(bbox, c[2], c[3])), total: todas.length };
+  const [fijas, windy] = await Promise.all([
+    catalogo().then(({ todas }) => todas).catch(() => []),
+    camarasWindyEn(bbox),
+  ]);
+  if (fijas.length === 0 && windy.length === 0 && Object.values(estado).every((v) => String(v).startsWith('error'))) {
+    throw new ErrorFuente('ninguna fuente de cámaras respondió');
+  }
+  const camaras = fijas.filter((c) => dentro(bbox, c[2], c[3])).concat(windy);
+  return { camaras, total: fijas.length + windy.length };
 }

@@ -102,14 +102,17 @@ Todas van en `argos-atlas/.env`, que git ignora. Nunca en el chat ni en el repos
    3. En `.env`: `AISSTREAM_API_KEY=<clave>`. Sin ella solo ves barcos del Báltico.
 4. **Ubicación del plano, opcional.** `PLANO_LAT` y `PLANO_LNG` con la esquina suroeste de tu casa. Saca las
    coordenadas con clic derecho en Google Maps.
-5. **CARTO (mapa de fondo), opcional.** Sin clave, el fondo es el mapa gris oscuro de Esri. Para el Dark Matter de
+5. **Windy (cámaras de todo el mundo), recomendado.** Crea una cuenta en https://www.windy.com, entra en
+   https://api.windy.com/keys, crea una clave de **Webcams API** y ponla en `WINDY_API_KEY`. Sin ella solo hay cámaras
+   de Londres, Nueva York y Finlandia.
+6. **CARTO (mapa de fondo), opcional.** Sin clave, el fondo es el mapa gris oscuro de Esri. Para el Dark Matter de
    CARTO, pide una clave gratuita en https://carto.com/basemaps/apikey/ y ponla en `CARTO_API_KEY`.
-6. **RuView, solo con nodos ESP32.** `RUVIEW_URL=ws://ruview:3001/ws/sensing` y `RUVIEW_API_TOKEN` con un secreto
+7. **RuView, solo con nodos ESP32.** `RUVIEW_URL=ws://ruview:3001/ws/sensing` y `RUVIEW_API_TOKEN` con un secreto
    generado en PowerShell: `[guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')`.
-7. **Aplica los cambios.** `docker compose up -d --force-recreate argos` (con RuView, añade `--profile ruview`).
+8. **Aplica los cambios.** `docker compose up -d --force-recreate argos` (con RuView, añade `--profile ruview`).
    Revisa con `docker compose logs -f argos`.
 
-Las cámaras (TfL, NYC DOT, Fintraffic) y Digitraffic no necesitan clave.
+Las cámaras de TfL, NYC DOT y Fintraffic, Digitraffic y GDELT (conflictos) no necesitan clave.
 
 ## Configuración opcional (`.env`)
 
@@ -134,6 +137,7 @@ Copia `.env.example` como `.env` (git lo ignora).
 | Barcos | [Digitraffic](https://www.digitraffic.fi/en/marine-traffic/) (Fintraffic, CC BY 4.0) | No | AIS real del Báltico. Se renueva cada 20 s y oculta las posiciones de más de 1 h. |
 | Barcos | [aisstream.io](https://aisstream.io) | Sí, gratuita | AIS mundial por WebSocket. El servidor solo se suscribe a la zona que estás mirando. |
 | Mapa de fondo | Esri (sin clave) o [CARTO](https://carto.com/basemaps/apikey/) con `CARTO_API_KEY` | Opcional | Si un proveedor falla, pasa al siguiente; el último es OpenStreetMap oscurecido. |
+| Cámaras | [Windy Webcams](https://api.windy.com/webcams) (todo el mundo) | Sí, gratuita | Más de 70 000 cámaras públicas: ciudades, playas, volcanes, puertos. Solo las de la zona visible (hasta 200); la imagen se pide al abrir cada una porque su URL caduca. En violeta. |
 | Cámaras | [TfL JamCams](https://api.tfl.gov.uk) (Londres) | No | Imagen y clip de vídeo corto. |
 | Cámaras | [NYC DOT](https://webcams.nyctmc.org) (Nueva York) | No | Imagen en vivo. |
 | Cámaras | [Fintraffic](https://www.digitraffic.fi/en/road-traffic/) (Finlandia) | No | Cámaras de carretera. |
@@ -141,6 +145,18 @@ Copia `.env.example` como `.env` (git lo ignora).
 Las cámaras se leen de los catálogos oficiales (cientos por fuente) en vez de una lista fija, para que no queden
 enlaces muertos. El catálogo se renueva cada 6 h. Madrid todavía no está: se puede sumar como cuarta fuente en
 `server/camaras.js`.
+
+### Conflictos
+
+La capa **Conflictos** lee cada 15 minutos los eventos de [GDELT 2.0](https://www.gdeltproject.org), sin clave. Se
+queda con los de conflicto material (códigos CAMEO 18 agresión, 19 combate y 20 violencia masiva) de las últimas 24 h y
+los agrupa por lugar. El popup enseña el desglose y hasta cinco enlaces a las noticias.
+
+- Son eventos **reportados en noticias y codificados por máquina**, no confirmados: hay duplicados y errores de
+  ubicación. Los que solo traen el país o la región se marcan con borde punteado (punto en el centro).
+- Al arrancar carga las últimas 2 h (un archivo cada 6 s, como pide GDELT) y luego cada archivo nuevo.
+- ACLED, la base curada de referencia, ya no da acceso a su API con la cuenta gratuita (2026), por eso no se usa.
+- El servicio geográfico GEO 2.0 de GDELT responde 404 desde 2026; por eso se leen sus archivos de eventos.
 
 ## Rendimiento
 

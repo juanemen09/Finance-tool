@@ -295,6 +295,8 @@ con las presencias de RuView. Detalle en `argos-atlas/README.md`.
   Ningún agente presenta como personas reales las insignias `SIMULADO` o `RUVIEW · DEMO`.
 - También es la pestaña **Seguridad** del centro de mando (`http://127.0.0.1:8765/seguridad`). `python -m dashboard`
   la arranca con Docker si no responde.
+- La capa **Conflictos** (GDELT, eventos reportados en noticias y codificados por máquina) es contexto. No es una señal
+  validada y, como el sentimiento, solo justifica una alerta de riesgo si afecta a Binance o a un activo del universo.
 - La ubicación del plano va solo en `argos-atlas/.env` (`PLANO_LAT`/`PLANO_LNG`), nunca en el repositorio.
 
 ## Equipo humano (pedido del usuario, 2026-09-27)

@@ -165,6 +165,21 @@ export function crearCapaPlano(map, renderer, { contador, lista, insignia, estad
     };
   }
 
+  // El plano de la casa solo se pinta de cerca: en la vista de ciudad o del mundo sus etiquetas taparían los datos.
+  const ZOOM_MINIMO = 15;
+  function ajustarAlZoom() {
+    const debeVerse = visible && map.getZoom() >= ZOOM_MINIMO;
+    if (debeVerse && !map.hasLayer(grupoPlano)) {
+      grupoPlano.addTo(map);
+      grupoPresencia.addTo(map);
+      // El divIcon se recrea al volver al mapa: reaplica el estado del pulso.
+      for (const o of objetivos.values()) o.pulso.getElement()?.classList.toggle('movimiento', o.datos?.state === 'movimiento');
+    } else if (!debeVerse && map.hasLayer(grupoPlano)) {
+      grupoPlano.remove();
+      grupoPresencia.remove();
+    }
+  }
+
   return {
     async iniciar() {
       const cfg = await (await fetch('/api/plano')).json();
@@ -175,13 +190,12 @@ export function crearCapaPlano(map, renderer, { contador, lista, insignia, estad
     },
     activar() {
       visible = true;
-      grupoPlano.addTo(map);
-      grupoPresencia.addTo(map);
-      // El divIcon se recrea al volver al mapa: reaplica el estado del pulso.
-      for (const o of objetivos.values()) o.pulso.getElement()?.classList.toggle('movimiento', o.datos?.state === 'movimiento');
+      map.on('zoomend', ajustarAlZoom);
+      ajustarAlZoom();
     },
     desactivar() {
       visible = false;
+      map.off('zoomend', ajustarAlZoom);
       grupoPlano.remove();
       grupoPresencia.remove();
     },
