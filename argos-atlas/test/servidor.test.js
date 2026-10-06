@@ -57,3 +57,14 @@ test('normalizarLectura acepta el esquema y descarta lo demás', () => {
   assert.equal(normalizarLectura('{"id":"a","coords":["x",0]}'), null);
   assert.match(normalizarLectura('{"id":"a","coords":[0,0],"state":"<script>"}'), /"state":"quieto"/);
 });
+
+test('Cache: un resultado incompleto caduca antes (ttlDe)', async () => {
+  const c = new Cache({ ttlMs: 10_000, ttlDe: (v) => (v.parcial ? 20 : 10_000) });
+  let n = 0;
+  const cargar = async () => ({ n: ++n, parcial: n === 1 });
+  assert.equal((await c.obtener('k', cargar)).n, 1);
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal((await c.obtener('k', cargar)).n, 2, 'el incompleto se volvió a pedir');
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal((await c.obtener('k', cargar)).n, 2, 'el completo sigue en caché');
+});

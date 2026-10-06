@@ -88,7 +88,8 @@ puerto del panel, usa `ARGOS_PANELES` en `argos-atlas/.env`.
 
 Todas van en `argos-atlas/.env`, que git ignora. Nunca en el chat ni en el repositorio.
 
-1. **Crea el archivo.** En PowerShell, dentro de `argos-atlas`: `copy .env.example .env`, y luego `notepad .env`.
+1. **Crea el archivo.** En PowerShell, dentro de `argos-atlas`: `copy .env.example .env`, y luego `notepad .env`. Si el
+   Bloc de notas dice que no encuentra `.env`, pulsa *Sí* para crearlo y escribe solo las líneas de tus claves.
 2. **OpenSky (vuelos), recomendado.**
    1. Crea una cuenta gratuita en https://opensky-network.org (botón *Login* → *Register*).
    2. Ya dentro, abre tu página de cuenta (*Account*) y busca la sección **API Client**. Pulsa *Create*: te da un
@@ -101,9 +102,11 @@ Todas van en `argos-atlas/.env`, que git ignora. Nunca en el chat ni en el repos
    3. En `.env`: `AISSTREAM_API_KEY=<clave>`. Sin ella solo ves barcos del Báltico.
 4. **Ubicación del plano, opcional.** `PLANO_LAT` y `PLANO_LNG` con la esquina suroeste de tu casa. Saca las
    coordenadas con clic derecho en Google Maps.
-5. **RuView, solo con nodos ESP32.** `RUVIEW_URL=ws://ruview:3001/ws/sensing` y `RUVIEW_API_TOKEN` con un secreto
+5. **CARTO (mapa de fondo), opcional.** Sin clave, el fondo es el mapa gris oscuro de Esri. Para el Dark Matter de
+   CARTO, pide una clave gratuita en https://carto.com/basemaps/apikey/ y ponla en `CARTO_API_KEY`.
+6. **RuView, solo con nodos ESP32.** `RUVIEW_URL=ws://ruview:3001/ws/sensing` y `RUVIEW_API_TOKEN` con un secreto
    generado en PowerShell: `[guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')`.
-6. **Aplica los cambios.** `docker compose up -d --force-recreate argos` (con RuView, añade `--profile ruview`).
+7. **Aplica los cambios.** `docker compose up -d --force-recreate argos` (con RuView, añade `--profile ruview`).
    Revisa con `docker compose logs -f argos`.
 
 Las cámaras (TfL, NYC DOT, Fintraffic) y Digitraffic no necesitan clave.
@@ -130,6 +133,7 @@ Copia `.env.example` como `.env` (git lo ignora).
 | Matrícula | [adsbdb.com](https://www.adsbdb.com) | No | Matrícula, modelo y propietario, al abrir el popup de un avión (OpenSky retiró su endpoint de metadatos). |
 | Barcos | [Digitraffic](https://www.digitraffic.fi/en/marine-traffic/) (Fintraffic, CC BY 4.0) | No | AIS real del Báltico. Se renueva cada 20 s y oculta las posiciones de más de 1 h. |
 | Barcos | [aisstream.io](https://aisstream.io) | Sí, gratuita | AIS mundial por WebSocket. El servidor solo se suscribe a la zona que estás mirando. |
+| Mapa de fondo | Esri (sin clave) o [CARTO](https://carto.com/basemaps/apikey/) con `CARTO_API_KEY` | Opcional | Si un proveedor falla, pasa al siguiente; el último es OpenStreetMap oscurecido. |
 | Cámaras | [TfL JamCams](https://api.tfl.gov.uk) (Londres) | No | Imagen y clip de vídeo corto. |
 | Cámaras | [NYC DOT](https://webcams.nyctmc.org) (Nueva York) | No | Imagen en vivo. |
 | Cámaras | [Fintraffic](https://www.digitraffic.fi/en/road-traffic/) (Finlandia) | No | Cámaras de carretera. |

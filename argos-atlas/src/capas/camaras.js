@@ -119,6 +119,7 @@ export function crearCapaCamaras(map, renderer, { contador, estado }) {
       const fallos = Object.entries(est ?? {}).filter(([, v]) => String(v).startsWith('error'));
       const texto = `${total} en catálogo · ${hora()}${fallos.length ? ` · sin respuesta: ${fallos.map(([k]) => k).join(', ')}` : ''}`;
       ponerEstado(estado, texto, fallos.length ? 'aviso' : '');
+      estado.title = fallos.map(([k, v]) => `${k}: ${v}`).join('\n'); // el detalle del fallo, al pasar el ratón
     },
     alError(e) {
       ponerEstado(estado, e.message, 'error');

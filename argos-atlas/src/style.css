@@ -152,3 +152,7 @@
   background: #0d141c;
   color: #334155;
 }
+/* Último recurso del mapa de fondo: OpenStreetMap claro convertido en oscuro. */
+.mapa-oscurecido {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.35);
+}

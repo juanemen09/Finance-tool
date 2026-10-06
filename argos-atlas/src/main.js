@@ -5,6 +5,7 @@ import { crearCapaBarcos } from './capas/barcos.js';
 import { crearCapaCamaras } from './capas/camaras.js';
 import { crearCapaPlano } from './capas/plano.js';
 import { crearCapaVuelos } from './capas/vuelos.js';
+import { ponerMapaBase } from './mapaBase.js';
 
 const CLAVE_VISTA = 'argos-atlas:vista';
 const $ = (id) => document.getElementById(id);
@@ -31,12 +32,13 @@ const map = L.map('map', {
 });
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.control.scale({ position: 'bottomright', imperial: false }).addTo(map);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  subdomains: 'abcd',
-  maxZoom: 23,
-  maxNativeZoom: 20, // más allá se amplía la última tesela: el plano de la casa necesita zoom 22-23
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-}).addTo(map);
+let config = {};
+try {
+  config = await (await fetch('/api/config')).json();
+} catch {
+  // sin proxy: mapa de fondo sin clave
+}
+ponerMapaBase(map, { cartoKey: config.cartoKey });
 
 map.on('moveend', () => {
   const c = map.getCenter();
@@ -74,7 +76,16 @@ for (const nombre of Object.keys(capas)) {
   aplicar();
 }
 
+// Ir al plano y volver: en el plano (zoom de casa) no hay aviones, barcos ni cámaras, así que se recuerda la vista
+// anterior para regresar a ella.
+const VISTA_GENERAL = { lat: 51.5, lng: -0.12, zoom: 9 };
+let vistaAnterior = vista.zoom < 17 ? vista : VISTA_GENERAL;
+
 $('ir-plano').addEventListener('click', () => {
+  if (map.getZoom() < 17) vistaAnterior = { ...map.getCenter(), zoom: map.getZoom() };
   $('t-plano').checked = true;
   capas.plano.irAlPlano();
+});
+$('ver-mapa').addEventListener('click', () => {
+  map.flyTo([vistaAnterior.lat, vistaAnterior.lng], vistaAnterior.zoom, { duration: 1.2 });
 });

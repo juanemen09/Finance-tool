@@ -7,7 +7,8 @@
 
 import { Cache, ErrorFuente, dentro, pedirJson } from './util.js';
 
-const cache = new Cache({ ttlMs: 6 * 3600_000, max: 1 });
+// Catálogo completo: 6 h. Si alguna fuente falló, se reintenta a los 5 min en vez de esperar 6 h sin ella.
+const cache = new Cache({ ttlMs: 6 * 3600_000, max: 1, ttlDe: (c) => (c.parcial ? 5 * 60_000 : 6 * 3600_000) });
 const estado = {};
 
 export function estadoCamaras() {
@@ -25,7 +26,7 @@ async function tfl() {
 }
 
 async function nyc() {
-  const { json } = await pedirJson('https://webcams.nyctmc.org/api/cameras', { timeoutMs: 20000 });
+  const { json } = await pedirJson('https://webcams.nyctmc.org/api/cameras', { timeoutMs: 40000 });
   return (json ?? []).flatMap((c) => {
     if (c.latitude == null || String(c.isOnline) === 'false') return [];
     const img = c.imageUrl || `https://webcams.nyctmc.org/api/cameras/${c.id}/image`;
@@ -53,17 +54,19 @@ async function catalogo() {
   return cache.obtener('todo', async () => {
     const resultados = await Promise.allSettled(Object.values(FUENTES).map((f) => f()));
     const todas = [];
+    let parcial = false;
     Object.keys(FUENTES).forEach((nombre, i) => {
       const r = resultados[i];
       estado[nombre] = r.status === 'fulfilled' ? `${r.value.length} cámaras` : `error: ${r.reason?.message ?? r.reason}`;
       if (r.status === 'fulfilled') todas.push(...r.value);
+      else parcial = true;
     });
     if (todas.length === 0) throw new ErrorFuente('ninguna fuente de cámaras respondió');
-    return todas;
+    return { todas, parcial };
   });
 }
 
 export async function camarasEn(bbox) {
-  const todas = await catalogo();
+  const { todas } = await catalogo();
   return { camaras: todas.filter((c) => dentro(bbox, c[2], c[3])), total: todas.length };
 }

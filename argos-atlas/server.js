@@ -76,6 +76,11 @@ app.get('/api/plano', (_req, res) => {
   res.json({ origen: origenPlano(), modo: MODO });
 });
 
+// Lo que el navegador necesita para el mapa de fondo. La clave de CARTO viaja de todos modos en cada URL de tesela.
+app.get('/api/config', (_req, res) => {
+  res.json({ cartoKey: process.env.CARTO_API_KEY || '' });
+});
+
 app.get('/api/estado', (_req, res) => {
   res.json({
     opensky: estadoOpenSky(),

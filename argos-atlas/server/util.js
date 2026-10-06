@@ -37,8 +37,10 @@ function clamp(v, a, b) {
 
 // Caché pequeña con TTL, tamaño máximo y peticiones en curso compartidas (dos pestañas = una sola llamada).
 export class Cache {
-  constructor({ ttlMs, max = 50 }) {
+  // ttlDe(valor) permite que un resultado incompleto caduque antes (p. ej. un catálogo con una fuente caída).
+  constructor({ ttlMs, max = 50, ttlDe = null }) {
     this.ttlMs = ttlMs;
+    this.ttlDe = ttlDe;
     this.max = max;
     this.datos = new Map();
     this.enCurso = new Map();
@@ -46,13 +48,13 @@ export class Cache {
 
   async obtener(clave, cargar) {
     const e = this.datos.get(clave);
-    if (e && Date.now() - e.t < this.ttlMs) return e.v;
+    if (e && Date.now() - e.t < e.ttl) return e.v;
     if (this.enCurso.has(clave)) return this.enCurso.get(clave);
     const p = (async () => {
       try {
         const v = await cargar();
         this.datos.delete(clave);
-        this.datos.set(clave, { t: Date.now(), v });
+        this.datos.set(clave, { t: Date.now(), v, ttl: this.ttlDe ? this.ttlDe(v) : this.ttlMs });
         while (this.datos.size > this.max) this.datos.delete(this.datos.keys().next().value);
         return v;
       } finally {

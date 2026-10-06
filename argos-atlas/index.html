@@ -45,7 +45,10 @@
           </label>
           <div class="flex items-center justify-between">
             <span id="fuente-presencia" class="insignia aviso">…</span>
-            <button id="ir-plano" class="rounded border border-neon/40 px-2 py-1 text-xs text-neon hover:bg-neon/10">Ir al plano ⌖</button>
+            <span class="flex gap-1">
+              <button id="ver-mapa" class="whitespace-nowrap rounded border border-slate-600 px-2 py-1 text-xs text-slate-300 hover:bg-slate-700" title="Volver a la vista donde estabas (aviones, barcos y cámaras)">← Mapa</button>
+              <button id="ir-plano" class="whitespace-nowrap rounded border border-neon/40 px-2 py-1 text-xs text-neon hover:bg-neon/10" title="Ir al plano de la casa">Plano ⌖</button>
+            </span>
           </div>
           <p id="e-presencia" class="estado"></p>
           <div class="flex items-center justify-between text-sm">
@@ -56,7 +59,7 @@
 
         <footer class="mt-auto text-[10px] leading-snug text-slate-500">
           Datos: OpenSky Network, Digitraffic/Fintraffic (CC BY 4.0), aisstream.io, Transport for London, NYC DOT. Mapa ©
-          OpenStreetMap, © CARTO. Presencia doméstica: RuView (ESP32 o Wi-Fi) o su emulador, según la insignia.
+          OpenStreetMap, Esri o CARTO. Presencia doméstica: RuView (ESP32 o Wi-Fi) o su emulador, según la insignia.
         </footer>
       </aside>
 
