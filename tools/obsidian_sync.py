@@ -159,7 +159,7 @@ def build_notes(state, radar, workspace, decisions, limits, now):
     note("Reglas/Reglas de riesgo.md", "regla", [
         "# Reglas de riesgo", f"Las fija {link('Juan Emilio')}; limitan a {link('Codex')} y {link('Claude')}.", "",
         f"- Veto {sa.get('veto_minutes', '—')} min · pérdida máx. {fmt(sa.get('max_loss_usdt'))} USDT · R:R mín. {fmt(sa.get('min_reward_risk'), 1)} · pérdida semanal máx. {fmt(sa.get('weekly_loss_limit_usdt'))} USDT.",
-        "- Fijo: solo Spot, 5 pares, 7 USDT por posición, 1 posición, solo estrategias LIVE_ELIGIBLE.", "",
+        "- Fijo: solo Spot, 5 pares, 45 USDT por posición, 1 posición, solo estrategias LIVE_ELIGIBLE.", "",
         "## Historia", *[f"- Fila {x['id']} ({str(x['created_at'])[:10]}): veto {x['veto_minutes']} min, pérdida {fmt(x['max_loss_usdt'])}, R:R {fmt(x['min_reward_risk'], 1)}, semanal {fmt(x['weekly_loss_limit_usdt'])}. Cita: {x['user_message_quote'][:300]}" for x in limits]])
     for d in decisions:
         note(f"Decisiones/Decisión {d['id']}.md", "decision", [

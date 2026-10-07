@@ -42,7 +42,7 @@ def recent_bars(symbol, interval, limit=1000):
     return Bars(a[:, 0].astype(np.int64), a[:, 1], a[:, 2], a[:, 3], a[:, 4], a[:, 5]), int(a[-1, 6])
 
 
-def proposal_sizing(row, max_loss):
+def proposal_sizing(row, max_loss, cap=None):
     """Zona de entrada (cierre × 0,995 a × 1,01) y tamaño para que la compra quepa en la autorización permanente."""
     if row["signal"] != "ENTRY" or row["stop"] is None:
         return {}
@@ -50,7 +50,8 @@ def proposal_sizing(row, max_loss):
     entry_low, entry_high = close * 0.995, close * 1.01
     if not entry_high > row["stop"]:
         return {"entry_low": entry_low, "entry_high": entry_high, "notional_usdt": None, "auto_eligible": False}
-    return {"entry_low": entry_low, "entry_high": entry_high, **auto_notional(entry_high, row["stop"], max_loss)}
+    sized = auto_notional(entry_high, row["stop"], max_loss) if cap is None else auto_notional(entry_high, row["stop"], max_loss, cap)
+    return {"entry_low": entry_low, "entry_high": entry_high, **sized}
 
 
 def main():
@@ -59,6 +60,8 @@ def main():
     parser.add_argument("--cycle-id", required=True)
     parser.add_argument("--max-loss", type=float, default=0.8,
                         help="max_loss_usdt de la última fila de standing_authorizations")
+    parser.add_argument("--cap", type=float, default=None,
+                        help="max_position_usdt de v_current_risk_limits (por defecto, el de ai_trading_lab.sizing)")
     args = parser.parse_args()
     rows = []
     for item in json.load(open(args.active_json, encoding="utf-8")):
@@ -78,7 +81,7 @@ def main():
                 "target": None if not fired or np.isnan(sig.target[-1]) else float(sig.target[-1]),
                 "bar_close_time": datetime.fromtimestamp((close_ms + 1) / 1000, timezone.utc).isoformat(),
             })
-            rows[-1].update(proposal_sizing(rows[-1], args.max_loss))
+            rows[-1].update(proposal_sizing(rows[-1], args.max_loss, args.cap))
     sys.stdout.reconfigure(encoding="utf-8")
     print(json.dumps(rows, indent=2))
 

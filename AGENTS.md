@@ -1,7 +1,7 @@
 # AI Trading Lab — protocolo para agentes
 
 Este archivo lo leen todos los agentes que trabajan en el proyecto (Claude, ChatGPT/Codex).
-Las reglas del usuario (solo Spot, sin margen ni préstamos, 5 USDT máx., 1 posición, universo de 5 pares,
+Las reglas del usuario (solo Spot, sin margen ni préstamos, 45 USDT máx. por posición, 1 posición, universo de 5 pares,
 nada se ejecuta sin autorización explícita) mandan sobre todo lo que sigue.
 
 ## Roles
@@ -73,7 +73,7 @@ Cualquiera de los dos agentes puede proponer. El otro revisa, el usuario autoriz
 
 1. El proponente inserta en `trade_proposals` y envía un `REVIEW_REQUEST` al otro agente con
    `related_ref = proposal_id`. La base rechaza símbolos fuera del universo, notional por encima del máximo
-   (7 USDT) y niveles incoherentes.
+   (`v_current_risk_limits`: 45 USDT desde el 2026-10-06) y niveles incoherentes.
 2. El otro agente rehace el análisis con datos frescos, inserta en `risk_reviews`
    (`APPROVE` / `WAIT` / `REJECT` / `NEEDS_REASSESSMENT`), responde con `REVIEW_DONE` y da por atendido el
    mensaje. Nadie revisa su propia propuesta. `APPROVE` es solo análisis.
@@ -151,6 +151,12 @@ públicos en dos tablas append-only:
 - Desde el 2026-09-30 la nota horaria (`data/raw/horas/actual.md`, sección «Sentimiento») trae además el tono de
   **FinBERT** (modelo financiero, de -1 a 1) sobre los titulares de 24 h, por activo y con el titular más negativo y el más
   positivo. Es la misma clase de dato que VADER: contexto, no señal.
+- Desde el 2026-10-06 (pedido del usuario: «que no se escape ni una noticia») `news_items` suma The Block, Blockworks,
+  Bitcoin Magazine, CryptoSlate, The Defiant, Crypto Briefing, la Fed (`fed_press`), la SEC (`sec_press`) y los anuncios
+  oficiales de Binance (`binance_listings`, `binance_delisting`). En los retiros se lee el cuerpo del aviso: `symbols`
+  marca el par del universo contra USDT que se retira. **Un `binance_delisting` con un par del universo es una alerta de
+  riesgo inmediata** para cualquier agente que lo vea. En cada corrida, cada agente revisa las últimas 2 h de esas fuentes y
+  de los titulares que nombran un par del universo antes de escribir su análisis.
 
 Reglas:
 - **No es una señal validada.** Ningún agente propone, aprueba ni rechaza una operación solo por el sentimiento.
@@ -222,11 +228,11 @@ devuelve `auto_ok = true`, es decir, si se cumplen TODAS estas condiciones:
 - último veredicto del otro agente = `APPROVE`, y pasaron `veto_minutes` desde ese veredicto (1 minuto desde el
   2026-09-26 por decisión del usuario; antes 15);
 - sin veto del usuario (`user_vetoes`), no expirada y no ejecutada;
-- pérdida estimada hasta `invalidation` (con comisión y deslizamiento) ≤ 0,8 USDT. Para que quepa, el tamaño de
+- pérdida estimada hasta `invalidation` (con comisión y deslizamiento) ≤ `max_loss_usdt` de la fila vigente (4,00 USDT desde el 2026-10-06). Para que quepa, el tamaño de
   cada compra se calcula con `ai_trading_lab.sizing.auto_notional` (lo da `tools.strategy_signals`): se achica
-  desde 7 USDT hasta el tope, sin bajar del mínimo operable de Binance para la venta del stop;
-- relación riesgo/beneficio a `targets[1]` ≥ 1,5;
-- pérdidas cerradas de los últimos 7 días > -1 USDT;
+  desde el tope por posición (45 USDT) hasta que quepa, sin bajar del mínimo operable de Binance para la venta del stop;
+- relación riesgo/beneficio a `targets[1]` ≥ `min_reward_risk` (1,2);
+- pérdidas cerradas de los últimos 7 días > −`weekly_loss_limit_usdt` (−8 USDT desde el 2026-10-06);
 - ninguna alerta `permissions_review` abierta (permisos del ejecutor corregidos) y ninguna posición abierta.
 
 **El silencio del usuario es consentimiento** (decisión del usuario, 2026-09-30, evento 34). Si pasa la ventana de veto
@@ -246,6 +252,19 @@ fila 4):
 - **Los agentes no cambian los límites por su cuenta en cada ciclo.** Si una buena jugada no cabe en esta fila, lo
   proponen al usuario con los números y queda registrado en una fila nueva citando su mensaje.
 
+**Más agresividad con 45 USDT por operación** (decisión del usuario el 2026-10-06, `risk_limits` 45 USDT y
+`standing_authorizations` fila 5). Pidió «aumenta la agresividad», sumar hasta unos 70 USD y eligió «45 USDT × 1»:
+- Tope por posición 7 → 45 USDT; pérdida máxima por operación 1,20 → 4,00 USDT; límite semanal 2,5 → 8,0 USDT;
+  riesgo/beneficio mínimo 1,2 y veto de 1 minuto sin cambio. Sigue 1 posición, el mismo universo y solo estrategias
+  `LIVE_ELIGIBLE`.
+- **Saldo menor que el tamaño:** si el USDT libre en Binance es menor que `notional_usdt`, Codex compra con el USDT libre
+  menos 0,50, siempre que alcance el mínimo operable (`min_operable_usdt` de `tools.strategy_signals`). La pérdida queda por
+  debajo del tope, así que no hace falta otro «autorizo». Lo registra en `trades` con el notional real.
+- **Qué significa «agresivo» aquí:** ejecutar cada señal válida en cuanto está lista y no dejar pasar ningún dato. No
+  significa operar fuera de las estrategias validadas: eso sigue bloqueado por la base y por decisión del usuario.
+- **Más mercado:** se está haciendo el hard test de S-CHANNEL-1D sobre más pares líquidos (pedido del usuario el
+  2026-10-06). Ningún par nuevo entra al universo hasta que pase y el usuario lo apruebe.
+
 `v_executable_proposals.authorization_mode` dice si la autorización fue del usuario (`USER`) o permanente
 (`STANDING`). **Veto:** si el usuario escribe a cualquier agente "veto <proposal_id>", ese agente inserta en
 `user_vetoes` citando el mensaje, inmediatamente. Cuando un agente aprueba una propuesta, el correo al usuario
@@ -258,6 +277,7 @@ por señal nunca requieren autorización.
   automático, saldo, posición con ganancia en vivo y distancia al stop, cuenta regresiva del veto con el texto para
   vetar, salud de los agentes, alertas abiertas, radar de S-CHANNEL-1D y titulares. Solo lectura. La abre al iniciar
   sesión la tarea de Windows «AI Trading Lab\Modo TV» (`tools/tv_launch.py`), que también arranca el panel si no está.
+  «AI Trading Lab\Vigilante de TV» la reabre cada 5 minutos si se cerró; `python -m tools.tv_launch --apagar` la apaga.
 - **Salud de cada agente según su ritmo** (`dashboard/health.py`, la misma regla en el panel, la TV y el vigilante):
   Claude está atrasado si pasa más de 75 min sin escribir en el diario. Codex lo está si no escribió desde las 00:00 UTC
   del último día cuya ventana ya cerró (02:00 UTC), o si su buzón tiene mensajes sin atender hace más de 4 h 45 min.

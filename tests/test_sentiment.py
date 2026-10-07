@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from tools.ingest_sentiment import collect, insert_direct, parse_since, summarize
 from ai_trading_lab.sentiment import (
-    MODEL_VERSION, news_item, parse_bluesky, parse_fear_greed, parse_funding, parse_long_short, parse_rss, score,
+    MODEL_VERSION, news_item, parse_binance_announcements, parse_bluesky, parse_fear_greed, parse_funding, parse_long_short, parse_rss, score,
     tag_symbols, to_sql,
 )
 
@@ -42,6 +42,13 @@ BLUESKY = {"feed": [
               "record": {"text": "reposted content", "createdAt": "2026-09-24T04:01:00.000Z"}},
      "reason": {"$type": "app.bsky.feed.defs#reasonRepost"}},
 ]}
+
+CODE = "0123456789abcdef0123456789abcdef"
+BINANCE = {"code": "000000", "data": {"catalogs": [{"catalogId": 161, "articles": [
+    {"code": CODE, "title": "Notice of Removal of Spot Trading Pairs - 2026-09-26", "releaseDate": 1790222400000},
+    {"code": "not-a-code/../x", "title": "Inyección en el enlace", "releaseDate": 1790222400000},
+    {"code": "f" * 32, "title": "Binance Will Delist ONDO", "releaseDate": 1789000000000},
+]}]}}
 
 NOW = datetime(2026, 9, 24, 5, 0, tzinfo=timezone.utc)
 SINCE = datetime(2026, 9, 23, 0, 0, tzinfo=timezone.utc)
@@ -151,6 +158,25 @@ class ParseTest(unittest.TestCase):
         self.assertEqual((obs["metric"], obs["value"]), ("long_short_account_ratio", "1.1668"))
 
 
+class BinanceAnnouncementsTest(unittest.TestCase):
+    def test_pairs_in_the_body_are_tagged_and_bad_codes_dropped(self):
+        seen = []
+
+        def detail(code):
+            seen.append(code)
+            return "Binance will remove ONDO/USDT, SOL / USDT and ETH/BTC."
+        items = parse_binance_announcements("binance_delisting", BINANCE, SINCE, detail)
+        self.assertEqual(len(items), 1)  # el código raro no se convierte en enlace; el viejo queda fuera
+        self.assertEqual(items[0]["symbols"], ["ONDOUSDT", "SOLUSDT"])
+        self.assertEqual(items[0]["url"], f"https://www.binance.com/en/support/announcement/{CODE}")
+        self.assertEqual(seen, [CODE])
+
+    def test_listings_use_only_the_title(self):
+        items = parse_binance_announcements("binance_listings", BINANCE, datetime(2026, 9, 1, tzinfo=timezone.utc))
+        self.assertEqual([i["symbols"] for i in items], [[], ["ONDOUSDT"]])
+        self.assertTrue(all(i["author"] == "Binance" for i in items))
+
+
 class ToSqlTest(unittest.TestCase):
     def test_payload_round_trips_inside_dollar_quotes(self):
         hostile = "Robert'); drop table news_items; -- $s$ $sent$"
@@ -192,6 +218,10 @@ class CollectTest(unittest.TestCase):
             if "LongShort" in url:
                 sym = re.search(r"symbol=(\w+)", url).group(1)
                 return json.dumps([{"symbol": sym, "longShortRatio": "1.2", "timestamp": 1790222400000}])
+            if "article/list" in url:
+                return json.dumps(BINANCE)
+            if "article/detail" in url:
+                return '{"data": {"body": "We will remove ONDO/USDT and LINK/BTC on 2026-09-26."}}'
             if "bsky" in url:
                 return json.dumps(BLUESKY)
             if "reddit" in url:
@@ -205,7 +235,11 @@ class CollectTest(unittest.TestCase):
         self.assertEqual(len(result["observations"]), 1 + 2 + 1 + 5 + 5)
         sources = {i["source"] for i in result["news"]}
         self.assertEqual(sources, {"coindesk", "cointelegraph", "decrypt", "reddit_cryptocurrency", "bluesky",
-                                   "oilprice", "cnbc_energy", "investing_commodities"})
+                                   "oilprice", "cnbc_energy", "investing_commodities", "theblock", "blockworks",
+                                   "bitcoinmagazine", "cryptoslate", "thedefiant", "cryptobriefing", "fed_press",
+                                   "sec_press", "binance_listings", "binance_delisting"})
+        delist = next(i for i in result["news"] if i["source"] == "binance_delisting")
+        self.assertEqual(delist["symbols"], ["ONDOUSDT"])  # del cuerpo; LINK/BTC no toca LINKUSDT
 
     def test_duplicate_items_are_collapsed(self):
         # Las tres cuentas de Bluesky devuelven el mismo post en la prueba: debe quedar uno.

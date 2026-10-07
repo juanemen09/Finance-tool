@@ -6,7 +6,7 @@
 
 Plano minuto a minuto en docs/plans/pipeline-horario.md. Resumen de la corrida:
   1. Mercado: indicadores de 1h de los 5 pares (Binance, API pública).
-  2. Guardia de ejecución: spread y deslizamiento estimado de una orden de 7 USDT desde el libro de órdenes;
+  2. Guardia de ejecución: spread y deslizamiento estimado de una orden de 45 USDT (el tope vigente) desde el libro de órdenes;
      marca `abortar` si el spread > 0,2 % o el deslizamiento > 0,15 % (regla que aplica Codex, AGENTS.md).
   3. Sentimiento: Fear & Greed y tono de titulares del diario (rol dashboard_reader).
   4. TimesFM 1-4 h: proceso efímero con su propio Python; al terminar libera toda su memoria.
@@ -41,7 +41,7 @@ from dashboard.config import load_env  # noqa: E402
 from tools.obsidian_sync import END, FOLDER, START, safe_name  # noqa: E402
 
 SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "ONDOUSDT")
-ORDER_USDT = 7.0
+ORDER_USDT = 45.0  # tope por posición desde el 2026-10-06
 MAX_SPREAD_PCT = 0.2
 MAX_SLIPPAGE_PCT = 0.15
 TSFM_PYTHON = Path(r"C:\TimesFM_Research\.venv\Scripts\python.exe")
@@ -262,7 +262,7 @@ def note_body(record, prev_name, similar, outcome):
                 lines.append(f"| [[{s.replace('USDT', '')}]] | {_fmt(st['p10'], 4)} | {_fmt(st['p50'], 4)} | {_fmt(st['p90'], 4)} |")
     else:
         lines.append(f"Sin pronóstico esta hora: {record.get('timesfm_error') or 'no corrió'}.")
-    lines += ["", "## Guardia de ejecución (orden de 7 USDT; Codex la recalcula en vivo antes de operar)",
+    lines += ["", "## Guardia de ejecución (orden de 45 USDT; Codex la recalcula en vivo antes de operar)",
               "| Activo | Spread % | Desliz. compra % | Desliz. venta % | ¿Abortar? |", "|---|---|---|---|---|"]
     for s, g in (record.get("guardia") or {}).items():
         lines.append(f"| {s.replace('USDT', '')} | {_fmt(g.get('spread_pct'), 3)} | {_fmt(g.get('deslizamiento_compra_pct'), 3)} | "

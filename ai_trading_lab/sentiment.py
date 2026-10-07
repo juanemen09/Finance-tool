@@ -115,6 +115,33 @@ def parse_rss(source, xml_text, since):
     return out
 
 
+# En los avisos de retiro de pares el título no nombra los activos: van en el cuerpo. Solo cuenta el par contra USDT
+# (retirar ONDO/BTC no toca ONDOUSDT).
+UNIVERSE_PAIR = re.compile(r"\b(BTC|ETH|SOL|LINK|ONDO)\s*/\s*USDT\b")
+BINANCE_CODE = re.compile(r"^[0-9a-f]{32}$")
+
+
+def parse_binance_announcements(source, payload, since, detail=None):
+    """Anuncios oficiales de Binance (nuevos listados, retiros). `detail(code)` devuelve el texto del anuncio para
+    buscar ahí los pares del universo. Se guardan solo el título y el enlace, como con cualquier medio."""
+    out = []
+    for catalog in ((payload or {}).get("data") or {}).get("catalogs", []):
+        for a in catalog.get("articles", []):
+            code, title, ms = a.get("code") or "", a.get("title"), a.get("releaseDate")
+            if not (title and ms and BINANCE_CODE.match(code)):
+                continue
+            published = datetime.fromtimestamp(int(ms) / 1000, tz=timezone.utc)
+            if published < since:
+                continue
+            item = news_item(source, f"binance:{code}", title, f"https://www.binance.com/en/support/announcement/{code}",
+                             _utc_iso(published), author="Binance")
+            if detail:
+                found = {f"{m}USDT" for m in UNIVERSE_PAIR.findall(detail(code) or "")}
+                item["symbols"] = sorted(set(item["symbols"]) | found)
+            out.append(item)
+    return out
+
+
 def parse_bluesky(payload, since):
     """Feed de autor de Bluesky. Los reposts se descartan: interesa lo que publica la cuenta, no lo que comparte."""
     out = []

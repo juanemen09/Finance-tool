@@ -18,7 +18,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 from ai_trading_lab.sentiment import (
-    parse_bluesky, parse_fear_greed, parse_funding, parse_long_short, parse_rss, parse_rwa_tvl,
+    parse_binance_announcements, parse_bluesky, parse_fear_greed, parse_funding, parse_long_short, parse_rss, parse_rwa_tvl,
     parse_stablecoin_supply, to_sql, to_sql_statements,
 )
 from ai_trading_lab.sentiment_history import growth_series, parse_stablecoin_history
@@ -35,7 +35,23 @@ RSS_FEEDS = {
     "oilprice": "https://oilprice.com/rss/main",
     "cnbc_energy": "https://www.cnbc.com/id/19836768/device/rss/rss.html",
     "investing_commodities": "https://www.investing.com/rss/news_11.rss",
+    # Cobertura ampliada el 2026-10-06 (pedido del usuario: «que no se escape ni una noticia»). Verificadas ese día.
+    "theblock": "https://www.theblock.co/rss.xml",
+    "blockworks": "https://blockworks.co/feed",
+    "bitcoinmagazine": "https://bitcoinmagazine.com/.rss/full/",
+    "cryptoslate": "https://cryptoslate.com/feed/",
+    "thedefiant": "https://thedefiant.io/api/feed",
+    "cryptobriefing": "https://cryptobriefing.com/feed/",
+    # Macro y regulación: la Fed mueve la liquidez y la SEC, los ETF y las demandas.
+    "fed_press": "https://www.federalreserve.gov/feeds/press_all.xml",
+    "sec_press": "https://www.sec.gov/news/pressreleases.rss",
 }
+# Anuncios oficiales de Binance (endpoint público de su centro de anuncios). Un retiro de un par del universo es una
+# alerta de riesgo (AGENTS.md); un listado nuevo es contexto.
+BINANCE_ANNOUNCEMENTS = ("https://www.binance.com/bapi/composite/v1/public/cms/article/list/query"
+                         "?type=1&catalogId={catalog}&pageNo=1&pageSize=20")
+BINANCE_ARTICLE = "https://www.binance.com/bapi/composite/v1/public/cms/article/detail/query?articleCode={code}"
+BINANCE_CATALOGS = {"binance_listings": 48, "binance_delisting": 161}
 # Cuentas verificadas el 2026-09-24: las de Cointelegraph, The Block y Blockworks no existen en Bluesky, y la de
 # CoinDesk no publica desde febrero de 2025 (su RSS sí está al día).
 BLUESKY_ACCOUNTS = ["decrypt.co", "watcher.guru"]
@@ -97,6 +113,11 @@ def collect(since, fetch=fetch_text, now=None):
             json.loads(fetch(f"{FUTURES}/futures/data/globalLongShortAccountRatio?{q2}"))))
     for source, url in RSS_FEEDS.items():
         news += attempt(source, lambda: parse_rss(source, fetch(url), since=since))
+    for source, catalog in BINANCE_CATALOGS.items():
+        # En los retiros se lee el cuerpo: ahí están los pares afectados.
+        detail = (lambda code: fetch(BINANCE_ARTICLE.format(code=code))) if source == "binance_delisting" else None
+        news += attempt(source, lambda: parse_binance_announcements(
+            source, json.loads(fetch(BINANCE_ANNOUNCEMENTS.format(catalog=catalog))), since, detail))
     for handle in BLUESKY_ACCOUNTS:
         q = urllib.parse.urlencode({"actor": handle, "limit": 30})
         news += attempt(f"bluesky:{handle}", lambda: parse_bluesky(json.loads(fetch(f"{BLUESKY_FEED}?{q}")),

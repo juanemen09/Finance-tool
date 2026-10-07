@@ -3,12 +3,12 @@
 La base estima la pérdida como auto_authorization_status: salto del stop desde el peor precio de la zona
 (entry_high) más comisión y deslizamiento de ida y vuelta (0,15 % por lado). Con 7 USDT fijos, un stop a 2 ATR
 en un activo volátil pasaba de 0,8 USDT y la compra nunca podía ejecutarse sola; el usuario pidió (2026-09-26)
-achicar la posición hasta que quepa.
+achicar la posición hasta que quepa. Desde el 2026-10-06 el tope es 45 USDT (risk_limits, decisión del usuario).
 """
 import math
 
 COST_PER_SIDE = 0.0015
-MAX_POSITION_USDT = 7.0
+MAX_POSITION_USDT = 45.0  # el de v_current_risk_limits; tools.strategy_signals --cap lo sobrescribe
 # Binance exige 5 USDT por orden, también en la venta del stop: la cantidad comprada valorada al precio del stop
 # debe superar ese mínimo, con un margen para el redondeo de la cantidad.
 MIN_STOP_NOTIONAL = 5.1
