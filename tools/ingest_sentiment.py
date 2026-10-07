@@ -24,7 +24,9 @@ from ai_trading_lab.sentiment import (
 from ai_trading_lab.sentiment_history import growth_series, parse_stablecoin_history
 from dashboard.config import load_env
 
-SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "ONDOUSDT"]
+from ai_trading_lab.universe import UNIVERSE  # noqa: E402
+
+SYMBOLS = list(UNIVERSE)  # funding y largo/corto de los 15 pares
 RSS_FEEDS = {
     "coindesk": "https://www.coindesk.com/arc/outboundfeeds/rss/",
     "cointelegraph": "https://cointelegraph.com/rss",

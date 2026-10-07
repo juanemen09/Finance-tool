@@ -11,7 +11,9 @@ from datetime import datetime, timezone
 from ai_trading_lab.candles import closed_only, fetch_klines, get_json
 from ai_trading_lab.indicators import atr, ema, relative_volume, rsi, swing_points
 
-UNIVERSE = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "ONDOUSDT"]
+from ai_trading_lab.universe import UNIVERSE as _UNIVERSE  # noqa: E402
+
+UNIVERSE = list(_UNIVERSE)
 TIMEFRAMES = {"4h": 30, "1h": 50}  # velas para el rango reciente
 
 

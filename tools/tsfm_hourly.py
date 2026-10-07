@@ -13,7 +13,7 @@ import numpy as np
 from ai_trading_lab.candles import closed_only, fetch_klines
 from ai_trading_lab.forecasting import QUANTILES
 
-SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "ONDOUSDT")
+SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "ONDOUSDT")  # ai_trading_lab.universe.TIMESFM_SYMBOLS: no caben más
 CONTEXT_HOURS = 720
 HORIZON = 4
 PICK = {"p10": QUANTILES.index(0.1), "p50": QUANTILES.index(0.5), "p90": QUANTILES.index(0.9)}

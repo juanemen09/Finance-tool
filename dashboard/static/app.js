@@ -3,8 +3,10 @@
 (() => {
   "use strict";
 
-  const UNIVERSE = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "ONDOUSDT"];
-  const RADAR = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT"]; // S-CHANNEL-1D no incluye ONDO
+  // Igual que ai_trading_lab/universe.py (15 pares desde el 2026-10-07).
+  const UNIVERSE = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "ONDOUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT", "ADAUSDT",
+    "AVAXUSDT", "TRXUSDT", "LTCUSDT", "DOTUSDT", "BCHUSDT", "NEARUSDT"];
+  const RADAR = UNIVERSE.filter((s) => s !== "ONDOUSDT"); // las estrategias de canal no operan ONDO
   const INTERVALS = [["1h", "1 h"], ["4h", "4 h"], ["1d", "1 día"]];
   const AGENT_NAMES = { claude: "Claude", chatgpt: "Codex" };
   const KIND_NAMES = {

@@ -37,6 +37,17 @@ SYMBOL_PATTERNS = {
     "SOLUSDT": re.compile(r"\b(?:[Ss]olana|SOLANA|SOL)\b"),
     "LINKUSDT": re.compile(r"\b(?:[Cc]hainlink|CHAINLINK|LINK)\b"),
     "ONDOUSDT": re.compile(r"\bondo\b", re.I),
+    # Pares de S-CHANNEL-1D-WIDE (2026-10-07). Tickers que también son palabras comunes (ADA, DOT, NEAR) solo en mayúsculas.
+    "BNBUSDT": re.compile(r"\b(?:BNB|[Bb]inance [Cc]oin)\b"),
+    "XRPUSDT": re.compile(r"\b(?:XRP|[Rr]ipple)\b"),
+    "DOGEUSDT": re.compile(r"\b(?:[Dd]ogecoin|DOGECOIN|DOGE)\b"),
+    "ADAUSDT": re.compile(r"\b(?:[Cc]ardano|CARDANO|ADA)\b"),
+    "AVAXUSDT": re.compile(r"\b(?:[Aa]valanche|AVALANCHE|AVAX)\b"),
+    "TRXUSDT": re.compile(r"\b(?:[Tt]ron|TRON|TRX)\b"),
+    "LTCUSDT": re.compile(r"\b(?:[Ll]itecoin|LITECOIN|LTC)\b"),
+    "DOTUSDT": re.compile(r"\b(?:[Pp]olkadot|POLKADOT|DOT)\b"),
+    "BCHUSDT": re.compile(r"\b(?:[Bb]itcoin [Cc]ash|BCH)\b"),
+    "NEARUSDT": re.compile(r"\b(?:NEAR [Pp]rotocol|NEAR)\b"),
 }
 ATOM = "{http://www.w3.org/2005/Atom}"
 AGENT_ID = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
@@ -117,7 +128,7 @@ def parse_rss(source, xml_text, since):
 
 # En los avisos de retiro de pares el título no nombra los activos: van en el cuerpo. Solo cuenta el par contra USDT
 # (retirar ONDO/BTC no toca ONDOUSDT).
-UNIVERSE_PAIR = re.compile(r"\b(BTC|ETH|SOL|LINK|ONDO)\s*/\s*USDT\b")
+UNIVERSE_PAIR = re.compile(r"\b(BTC|ETH|SOL|LINK|ONDO|BNB|XRP|DOGE|ADA|AVAX|TRX|LTC|DOT|BCH|NEAR)\s*/\s*USDT\b")
 BINANCE_CODE = re.compile(r"^[0-9a-f]{32}$")
 
 

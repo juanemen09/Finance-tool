@@ -40,7 +40,7 @@ if str(ROOT) not in sys.path:  # pythonw lo lanza como script, sin -m
 from dashboard.config import load_env  # noqa: E402
 from tools.obsidian_sync import END, FOLDER, START, safe_name  # noqa: E402
 
-SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "ONDOUSDT")
+from ai_trading_lab.universe import UNIVERSE as SYMBOLS  # noqa: E402  (guardia y mercado de los 15 pares)
 ORDER_USDT = 45.0  # tope por posición desde el 2026-10-06
 MAX_SPREAD_PCT = 0.2
 MAX_SLIPPAGE_PCT = 0.15

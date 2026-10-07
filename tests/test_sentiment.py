@@ -3,7 +3,7 @@ import re
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from tools.ingest_sentiment import collect, insert_direct, parse_since, summarize
+from tools.ingest_sentiment import SYMBOLS, collect, insert_direct, parse_since, summarize
 from ai_trading_lab.sentiment import (
     MODEL_VERSION, news_item, parse_binance_announcements, parse_bluesky, parse_fear_greed, parse_funding, parse_long_short, parse_rss, score,
     tag_symbols, to_sql,
@@ -232,7 +232,7 @@ class CollectTest(unittest.TestCase):
     def test_collects_every_source(self):
         result = collect(SINCE, fetch=self.fake_fetch())
         self.assertEqual(result["errors"], [])
-        self.assertEqual(len(result["observations"]), 1 + 2 + 1 + 5 + 5)
+        self.assertEqual(len(result["observations"]), 1 + 2 + 1 + 2 * len(SYMBOLS))  # funding y largo/corto por par
         sources = {i["source"] for i in result["news"]}
         self.assertEqual(sources, {"coindesk", "cointelegraph", "decrypt", "reddit_cryptocurrency", "bluesky",
                                    "oilprice", "cnbc_energy", "investing_commodities", "theblock", "blockworks",
@@ -249,7 +249,7 @@ class CollectTest(unittest.TestCase):
     def test_a_broken_source_does_not_stop_the_rest(self):
         result = collect(SINCE, fetch=self.fake_fetch(broken=("reddit", "alternative.me")))
         self.assertEqual({e["source"] for e in result["errors"]}, {"reddit_cryptocurrency", "alternative_me"})
-        self.assertEqual(len(result["observations"]), 13)
+        self.assertEqual(len(result["observations"]), 3 + 2 * len(SYMBOLS))  # sin el Fear & Greed caído
         self.assertIn("coindesk", {i["source"] for i in result["news"]})
 
     def test_summary_includes_stablecoin_growth_like_the_strategy(self):

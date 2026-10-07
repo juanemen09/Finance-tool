@@ -12,11 +12,10 @@ from ai_trading_lab.candles import closed_only, fetch_klines
 from ai_trading_lab.sentiment_history import STABLECOIN_URL, growth_series, parse_stablecoin_history
 from ai_trading_lab.strategies import rolling_max, rolling_min
 
-UNIVERSE = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "ONDOUSDT")
-CHANNEL_SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT")  # S-CHANNEL-1D no opera ONDO
+from ai_trading_lab.universe import CHANNEL_SYMBOLS, UNIVERSE  # noqa: E402  (15 pares desde el 2026-10-07)
 INTERVALS = ("1h", "4h", "1d")
 CACHE_SECONDS = 60
-RADAR_SECONDS = 30
+RADAR_SECONDS = 60  # 14 pares; una ruptura diaria no necesita más y la IP comparte límite con los agentes
 # S-CHANNEL-1D: entra si el cierre supera el máximo de 20 días; sale si pierde el mínimo de 10.
 ENTRY_LOOKBACK, EXIT_LOOKBACK = 20, 10
 

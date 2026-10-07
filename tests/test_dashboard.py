@@ -118,7 +118,7 @@ class ShapingTest(unittest.TestCase):
 class MarketTest(unittest.TestCase):
     def test_only_universe_symbols_and_known_intervals(self):
         self.assertEqual(validate_candles_request("BTCUSDT", "1d"), ("BTCUSDT", "1d"))
-        for symbol, interval in [("DOGEUSDT", "1d"), ("BTCUSDT", "1m"), ("BTCUSDT'; drop", "1d")]:
+        for symbol, interval in [("PEPEUSDT", "1d"), ("BTCUSDT", "1m"), ("BTCUSDT'; drop", "1d")]:
             with self.assertRaises(MarketError):
                 validate_candles_request(symbol, interval)
 
@@ -273,7 +273,7 @@ class ServerTest(unittest.TestCase):
 
     def test_candles_validation(self):
         self.assertEqual(self.get("/api/candles?symbol=BTCUSDT&interval=1d")[0], 200)
-        self.assertEqual(self.get("/api/candles?symbol=DOGEUSDT&interval=1d")[0], 400)
+        self.assertEqual(self.get("/api/candles?symbol=PEPEUSDT&interval=1d")[0], 400)
 
     def post(self, body, headers):
         request = urllib.request.Request(f"http://127.0.0.1:{self.port}/api/predicciones", data=body, method="POST", headers=headers)

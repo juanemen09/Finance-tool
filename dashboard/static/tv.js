@@ -117,7 +117,9 @@
   function secMarket() {
     const target = focusTarget();
     const f7 = forecastMap(7);
-    const rows = (radar?.rows || []).map((r) => {
+    // 14 pares desde el 2026-10-07: en pantalla, los 8 más cerca de la compra (los sin datos al final).
+    const all = [...(radar?.rows || [])].sort((a, b) => (a.error ? 9 : a.gap_to_entry) - (b.error ? 9 : b.gap_to_entry));
+    const rows = all.slice(0, 8).map((r) => {
       if (r.error) return h("div", { class: "row radar-row muted" }, h("b", { text: r.symbol.replace("USDT", "") }), h("span", { text: "sin datos" }));
       const gap = r.gap_to_entry, f = f7[r.symbol]?.median_return;
       return h("div", { class: `row radar-row ${r.in_strategy ? "" : "muted"}` },
@@ -129,14 +131,14 @@
     });
     if (target) loadChart(target);
     return {
-      title: target ? target.title : "Mercado · radar S-CHANNEL-1D",
+      title: target ? target.title : "Mercado · radar S-CHANNEL-1D y WIDE",
       sub: "precio en vivo de Binance · la compra se decide con el cierre diario",
       body: [target ? chartBox : null,
         h("div", { class: "rows stagger" },
           h("div", { class: "row radar-row sub" }, h("span"), h("span", { text: "Distancia a la compra (máx. 20 días)" }),
             h("span", { class: "num", text: "Precio" }), h("span", { class: "num", text: "Falta" }), h("span", { class: "num", text: "TimesFM 7 d" })),
           rows.length ? rows : empty("Cargando precios…")),
-        h("p", { class: "sub", text: "ONDO no entra en S-CHANNEL-1D. TimesFM es papel hasta pasar su prueba (≈ 6 dic)." })],
+        h("p", { class: "sub", text: `${all.length > 8 ? `Los 8 más cerca de ${all.length} pares. ` : ""}ONDO no entra en las estrategias de canal. TimesFM: solo los 5 originales, en papel hasta ≈ 6 dic.` })],
     };
   }
 
@@ -322,7 +324,7 @@
         h("div", { class: "tile" }, h("h3", { text: "Derivados y tono 24 h" }),
           hourly?.nota?.finbert?.n ? h("div", { class: "sub", text: `FinBERT (finanzas) ${signed(hourly.nota.finbert.mercado, 2)} sobre ${hourly.nota.finbert.n} titulares · la tabla usa VADER` }) : null,
           h("table", { class: "t" }, h("tr", {}, h("th", { text: "" }), h("th", { class: "num", text: "Funding" }), h("th", { class: "num", text: "Largo/corto" }), h("th", { class: "num", text: "Tono" })),
-            ["BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "ONDOUSDT"].map((s) => h("tr", {}, h("td", { text: s.replace("USDT", "") }),
+            (state.risk_limits?.universe || []).filter((s) => bySym[s] || toneBy[s]).slice(0, 8).map((s) => h("tr", {}, h("td", { text: s.replace("USDT", "") }),
               h("td", { class: "num", text: bySym[s] ? pct(bySym[s].funding_rate, 3) : "—" }),
               h("td", { class: "num", text: bySym[s] ? num(bySym[s].long_short_account_ratio, 2) : "—" }),
               h("td", { class: `num ${tone(toneBy[s]?.avg_sentiment)}`, text: toneBy[s] ? num(toneBy[s].avg_sentiment, 2) : "—" }))))),
@@ -737,7 +739,7 @@
     link("founder", "lab", "dirige", 1.5);
     add("rules", "Reglas de riesgo", "rules", 1.1, [`Veto ${sa.veto_minutes ?? "—"} min`, `Pérdida máx. ${num(sa.max_loss_usdt, 2)} USDT por operación`,
       `Riesgo/beneficio mín. ${num(sa.min_reward_risk, 1)}`, `Pérdida semanal máx. ${num(sa.weekly_loss_limit_usdt, 2)} USDT (llevas ${num(state.pnl_7d, 2)})`,
-      "Solo Spot · 5 pares · 7 USDT · 1 posición"]);
+      `Solo Spot · ${(state.risk_limits?.universe || []).length || 5} pares · ${num(state.risk_limits?.max_position_usdt, 0)} USDT · ${state.risk_limits?.max_open_positions ?? 1} posición`]);
     link("founder", "rules", "fija");
     link("rules", "lab", "limita");
 

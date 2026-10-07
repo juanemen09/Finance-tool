@@ -1,7 +1,7 @@
 # AI Trading Lab — protocolo para agentes
 
 Este archivo lo leen todos los agentes que trabajan en el proyecto (Claude, ChatGPT/Codex).
-Las reglas del usuario (solo Spot, sin margen ni préstamos, 45 USDT máx. por posición, 1 posición, universo de 5 pares,
+Las reglas del usuario (solo Spot, sin margen ni préstamos, 45 USDT máx. por posición, 1 posición, universo de 15 pares (`v_current_risk_limits`),
 nada se ejecuta sin autorización explícita) mandan sobre todo lo que sigue.
 
 ## Roles
@@ -128,6 +128,16 @@ Detalle completo en `docs/plans/strategy-pipeline.md`. Lo esencial:
 - Temporalidades y ventanas de prueba (12 meses de entrenamiento, 3 de prueba y 6 de reserva): `1h` 8760 /
   2190 / 4380 velas; `4h` 2190 / 548 / 1095; `1d` 365 / 91 / 183. Las velas de 4h y 1d se construyen desde 1h
   verificado y coinciden con las nativas de Binance.
+
+### Estado a 2026-10-07
+- **S-CHANNEL-1D-WIDE** es `LIVE_ELIGIBLE` por decisión del usuario (2026-10-07): es la misma regla y los mismos
+  parámetros de S-CHANNEL-1D (20/10/2 ATR), sin reajustar, sobre BNB, XRP, DOGE, ADA, AVAX, TRX, LTC, DOT, BCH y NEAR.
+  Pasó los 10 chequeos del hard test y la reserva final: 31 operaciones, acierto 35 %, mediana −3,6 %, media +7,2 % y
+  profit factor 2,6. Es tendencia pura: muchas pérdidas pequeñas y pocas ganancias grandes. **Nadie cierra antes de tiempo
+  una ganadora**: la salida es la regla del canal.
+- El universo pasa a 15 pares (`risk_limits`, lista en `ai_trading_lab/universe.py`). Con 1 posición, si llegan varias
+  señales ENTRY el mismo día se propone solo una: la del stop más cercano en % (mejor riesgo/beneficio a 2R); las demás
+  se registran en `strategy_signals` y no se proponen. TimesFM sigue con los 5 pares originales.
 
 ### Estado a 2026-09-24
 - `S-CHANNEL-1D` (canal de Donchian diario: entra si el cierre supera el máximo de 20 días, sale si cierra
@@ -262,8 +272,7 @@ fila 4):
   debajo del tope, así que no hace falta otro «autorizo». Lo registra en `trades` con el notional real.
 - **Qué significa «agresivo» aquí:** ejecutar cada señal válida en cuanto está lista y no dejar pasar ningún dato. No
   significa operar fuera de las estrategias validadas: eso sigue bloqueado por la base y por decisión del usuario.
-- **Más mercado:** se está haciendo el hard test de S-CHANNEL-1D sobre más pares líquidos (pedido del usuario el
-  2026-10-06). Ningún par nuevo entra al universo hasta que pase y el usuario lo apruebe.
+- **Más mercado:** S-CHANNEL-1D-WIDE (ver «Estado a 2026-10-07») suma 10 pares al universo, que pasa de 5 a 15.
 
 `v_executable_proposals.authorization_mode` dice si la autorización fue del usuario (`USER`) o permanente
 (`STANDING`). **Veto:** si el usuario escribe a cualquier agente "veto <proposal_id>", ese agente inserta en
