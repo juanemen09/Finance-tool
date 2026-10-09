@@ -267,6 +267,9 @@ body.night .stage { filter: brightness(0.5) saturate(0.85); }
 body.night #space { opacity: 0.55; }
 body.night .veto.live { filter: brightness(2); }
 
+/* Al trabajar en otra ventana la TV conserva la imagen y los datos, pero deja de recomponer animaciones a 60 Hz. */
+body.background *, body.background *::before, body.background *::after { animation-play-state: paused !important; }
+
 @keyframes breathe { 50% { opacity: 0.55; } }
 @keyframes alarm { 50% { box-shadow: 0 0 3vw var(--crimson); } }
 @keyframes scroll { to { transform: translateX(-100%); } }

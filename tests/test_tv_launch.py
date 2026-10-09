@@ -1,7 +1,8 @@
 import unittest
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 
-import tempfile
 from unittest import mock
 
 from tools import tv_launch
@@ -28,6 +29,8 @@ class ChromeArgsTest(unittest.TestCase):
     def test_kiosk_inside_the_tv_with_own_profile(self):
         args = chrome_args(Path("chrome.exe"), "http://127.0.0.1:8765/tv", TV, Path("perfil"))
         self.assertIn("--kiosk", args)
+        self.assertIn("--disable-background-mode", args)
+        self.assertIn("--disable-extensions", args)
         self.assertIn("--app=http://127.0.0.1:8765/tv", args)
         self.assertIn("--user-data-dir=perfil", args)
         x, y = map(int, next(a for a in args if a.startswith("--window-position=")).split("=")[1].split(","))
@@ -35,45 +38,38 @@ class ChromeArgsTest(unittest.TestCase):
 
 
 
-class WatchTest(unittest.TestCase):
-    SCREEN = (-1920, 0, 0, 1080, False)
+class LifecycleTest(unittest.TestCase):
+    def test_watchdog_option_no_longer_exists(self):
+        """Cerrar la TV debe ser final: no puede quedar una ruta CLI que la reabra."""
+        with mock.patch.object(tv_launch, "monitors", return_value=[]):
+            with redirect_stderr(StringIO()):
+                with self.assertRaises(SystemExit):
+                    tv_launch.main(["--vigilar"])
 
-    def setUp(self):
-        tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(tmp.cleanup)
-        patcher = mock.patch.object(tv_launch, "OFF_FLAG", Path(tmp.name) / "apagada")
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        log = mock.patch.object(tv_launch, "log")
-        log.start()
-        self.addCleanup(log.stop)
-        self.opened, self.killed = [], []
+    def test_panel_owned_by_launcher_stops_when_tv_closes(self):
+        panel, browser = mock.Mock(), mock.Mock()
+        panel.poll.return_value = None
+        with mock.patch.object(tv_launch, "panel_up", side_effect=[False, True]), \
+             mock.patch.object(tv_launch, "start_panel", return_value=panel), \
+             mock.patch.object(tv_launch, "CHROME_CANDIDATES", (Path(tv_launch.sys.executable),)), \
+             mock.patch.object(tv_launch.subprocess, "Popen", return_value=browser), \
+             mock.patch.object(tv_launch.time, "sleep"), \
+             mock.patch.object(tv_launch, "log"):
+            self.assertEqual(tv_launch.launch(TV), 0)
+        browser.wait.assert_called_once_with()
+        panel.terminate.assert_called_once_with()
+        panel.wait.assert_called_once_with(timeout=5)
 
-    def run_cmd(self, pids):
-        def run(cmd, **kwargs):
-            if cmd[0] == "taskkill":
-                self.killed.append(cmd[2])
-            return mock.Mock(stdout=" ".join(map(str, pids)))
-        return run
-
-    def test_open_tv_is_left_alone(self):
-        out = tv_launch.watch(self.SCREEN, windows=lambda: [1], open_tv=lambda: self.opened.append(1), run=self.run_cmd([]))
-        self.assertEqual((out, self.opened), ("abierta", []))
-
-    def test_closed_tv_is_reopened(self):
-        out = tv_launch.watch(self.SCREEN, windows=lambda: [], open_tv=lambda: self.opened.append(1), run=self.run_cmd([]))
-        self.assertEqual((out, self.opened, self.killed), ("reabierta", [1], []))
-
-    def test_error_page_restarts_only_the_tv_browser(self):
-        tv_launch.watch(self.SCREEN, windows=lambda: [], open_tv=lambda: self.opened.append(1), run=self.run_cmd([4242]))
-        self.assertEqual((self.killed, self.opened), (["4242"], [1]))
-
-    def test_switched_off_or_no_tv_screen_does_nothing(self):
-        tv_launch.OFF_FLAG.write_text("x", encoding="utf-8")
-        self.assertEqual(tv_launch.watch(self.SCREEN, windows=lambda: [], open_tv=lambda: self.opened.append(1)), "nada")
-        tv_launch.OFF_FLAG.unlink()
-        self.assertEqual(tv_launch.watch(None, windows=lambda: [], open_tv=lambda: self.opened.append(1)), "nada")
-        self.assertEqual(self.opened, [])
+    def test_owned_panel_stops_if_browser_is_missing(self):
+        panel = mock.Mock()
+        panel.poll.return_value = None
+        with mock.patch.object(tv_launch, "panel_up", side_effect=[False, True]), \
+             mock.patch.object(tv_launch, "start_panel", return_value=panel), \
+             mock.patch.object(tv_launch, "CHROME_CANDIDATES", ()), \
+             mock.patch.object(tv_launch.time, "sleep"), \
+             mock.patch.object(tv_launch, "log"):
+            self.assertEqual(tv_launch.launch(TV), 1)
+        panel.terminate.assert_called_once_with()
 
 
 if __name__ == "__main__":

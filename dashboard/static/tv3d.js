@@ -7,14 +7,19 @@
   const ctx = canvas.getContext("2d");
   const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const TAU = Math.PI * 2;
+  const ACTIVE_FRAME_MS = 1000 / 30;
+  const IDLE_FRAME_MS = 1000 / 2;
   let W = 0, H = 0, DPR = 1;
 
   const data = { assets: [], agents: {}, autopilot: false, live: false, section: 0 };
   const packets = []; // {from: "claude"|"chatgpt"|"link", t: 0..1, speed}
   const cam = { yaw: 0, pitch: 0.28, targetYaw: 0, dist: 11 };
 
+  const activeRendering = () => document.hasFocus() && performance.now() < activeUntil && !document.body.classList.contains("night");
+  const wantedDPR = () => Math.min(activeRendering() ? 1.25 : 1, window.devicePixelRatio || 1);
   function resize() {
-    DPR = Math.min(1.5, window.devicePixelRatio || 1);
+    // Conserva máxima nitidez al usar la TV y baja el búfer cuando se trabaja en otra ventana.
+    DPR = wantedDPR();
     W = canvas.width = Math.round(window.innerWidth * DPR);
     H = canvas.height = Math.round(window.innerHeight * DPR);
   }
@@ -349,14 +354,24 @@
     gcam.idleAt = Date.now() + 8000;
   }, { passive: false });
 
-  let last = performance.now(), t = 0, frameSkip = false;
+  let last = performance.now(), lastPaint = 0, t = 0, animationFrame = null;
+  let activeUntil = performance.now() + 5000;
+  const noteInteraction = () => {
+    activeUntil = performance.now() + 5000;
+    if (DPR !== wantedDPR()) resize();
+  };
+  const frameBudget = () => activeRendering() ? ACTIVE_FRAME_MS : IDLE_FRAME_MS;
+  function scheduleFrame() {
+    if (!still && animationFrame === null && !document.hidden && document.hasFocus()) animationFrame = requestAnimationFrame(frame);
+  }
   function frame(now) {
-    requestAnimationFrame(frame);
-    if (document.hidden) return;
-    const night = document.body.classList.contains("night");
-    if (night && (frameSkip = !frameSkip)) return; // de noche, 30 cuadros por segundo
+    animationFrame = null;
+    scheduleFrame();
+    if (document.hidden || !document.hasFocus() || now - lastPaint < frameBudget()) return;
+    if (DPR !== wantedDPR()) resize();
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
+    lastPaint = now;
     t += dt;
 
     // cámara: gira despacio y cada sección la lleva a otro ángulo con una transición suave
@@ -430,10 +445,29 @@
     },
   };
 
+  function stopFrames() {
+    if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+    animationFrame = null;
+  }
+  function resumeFrames() {
+    last = performance.now();
+    resize();
+    scheduleFrame();
+  }
+
   resize();
   window.addEventListener("resize", resize);
+  window.addEventListener("focus", resumeFrames);
+  window.addEventListener("blur", () => { stopFrames(); resize(); });
+  for (const event of ["pointerdown", "pointermove", "wheel", "keydown", "touchstart"]) {
+    window.addEventListener(event, noteInteraction, { passive: true });
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopFrames();
+    else resumeFrames();
+  });
   ctx.fillStyle = "#030818";
   ctx.fillRect(0, 0, W, H);
-  if (!still) requestAnimationFrame(frame);
+  if (!still) scheduleFrame();
   else frame(performance.now());
 })();

@@ -935,7 +935,7 @@
   if (window.TV3D) {
     window.TV3D.onGraphSelect((n) => { graphTourAt = Date.now() + 30_000; showGraphCard(n && graphNodes.get(n.id)); });
   }
-  setInterval(graphTour, 1000);
+  setInterval(() => { if (!document.hidden) graphTour(); }, 1000);
 
   // ---------------------------------------------------------------- interacción
   document.addEventListener("keydown", (e) => {
@@ -968,6 +968,14 @@
   async function keepAwake() {
     try { if ("wakeLock" in navigator && document.visibilityState === "visible") await navigator.wakeLock.request("screen"); } catch (e) { console.warn("wake lock", e); }
   }
+  function whileVisible(fn) {
+    return () => { if (!document.hidden) fn(); };
+  }
+  function visibilityChanged() {
+    keepAwake();
+    if (!document.hidden) Promise.all([refreshRadar(), refreshWorkspace(), refreshPredictions(), refreshHourly()]).then(refreshState);
+  }
+  const syncBackgroundMode = () => document.body.classList.toggle("background", !document.hasFocus());
   const shiftPixels = () => {
     const r = () => Math.round((Math.random() * 2 - 1) * SHIFT_PX);
     $("stage").style.transform = `translate(${r()}px, ${r()}px)`;
@@ -979,16 +987,19 @@
   if (window.TV3D) window.TV3D.set({ section: current });
 
   document.body.classList.add("idle");
+  syncBackgroundMode();
+  window.addEventListener("focus", syncBackgroundMode);
+  window.addEventListener("blur", syncBackgroundMode);
   tick();
-  setInterval(tick, 1000);
+  setInterval(whileVisible(tick), 1000);
   Promise.all([refreshRadar(), refreshWorkspace(), refreshPredictions(), refreshHourly()]).then(refreshState);
-  setInterval(refreshHourly, 60_000);
-  setInterval(refreshPredictions, 60_000);
-  setInterval(refreshState, 20_000);
-  setInterval(refreshRadar, 30_000);
-  setInterval(refreshWorkspace, 120_000);
-  setInterval(shiftPixels, 180_000);
+  setInterval(whileVisible(refreshHourly), 60_000);
+  setInterval(whileVisible(refreshPredictions), 60_000);
+  setInterval(whileVisible(refreshState), 20_000);
+  setInterval(whileVisible(refreshRadar), 30_000);
+  setInterval(whileVisible(refreshWorkspace), 120_000);
+  setInterval(whileVisible(shiftPixels), 180_000);
   setTimeout(() => location.reload(), 6 * 3_600_000); // una pantalla que nunca se cierra toma el código nuevo sola
-  document.addEventListener("visibilitychange", keepAwake);
+  document.addEventListener("visibilitychange", visibilityChanged);
   keepAwake();
 })();

@@ -246,6 +246,16 @@ class ServerTest(unittest.TestCase):
             self.assertIn(marker, body, path)
             self.assertIn("default-src 'self'", headers["Content-Security-Policy"])
 
+    def test_tv_animation_has_an_idle_frame_budget(self):
+        status, _, body = self.get("/static/tv3d.js")
+        self.assertEqual(status, 200)
+        self.assertIn(b"IDLE_FRAME_MS", body)
+        self.assertIn(b"document.hidden", body)
+        self.assertIn(b"document.hasFocus()", body)
+        status, _, css = self.get("/static/tv.css")
+        self.assertEqual(status, 200)
+        self.assertIn(b"body.background", css)
+
     def test_security_tab_frames_only_argos(self):
         status, headers, body = self.get("/seguridad")
         self.assertEqual(status, 200)
