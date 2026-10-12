@@ -1,0 +1,9 @@
+{
+  "_nota": "Radar de memecoins (tools/meme_radar.py). La lista de seguimiento se revisa en cada corrida aunque no aparezca en ninguna fuente. Usa siempre la dirección del contrato: los nombres se copian (Saturween tiene un clon con liquidez cero, F36EGVUBKn7eLbBJqbJCj4b7Y3ZuGSGsXLChegYg43HZ).",
+  "watchlist": [
+    {"mint": "5THtNEGTF1y67eRWvcgz3MomDZePCVx1xdskHHeCpump", "nota": "Saturween (Sam & Cat, Halloween). Pedido del usuario 2026-10-12."}
+  ],
+  "subreddits": ["solana", "SolanaMemeCoins", "memecoins", "CryptoMoonShots", "pumpfun"],
+  "max_rugcheck_per_run": 25,
+  "min_liquidity_usd": 10000
+}

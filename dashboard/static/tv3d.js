@@ -164,7 +164,7 @@
     hub: "255,77,109", agent: "69,224,176", alert: "255,77,109", market: "111,211,255", asset: "111,211,255",
     hot: "255,181,71", strategy: "170,140,255", rejected: "120,110,160", research: "255,214,110", forecast: "120,230,255",
     sentiment: "210,160,255", project: "90,150,255", person: "235,240,255", money: "80,230,140", zyneath: "255,130,200",
-    rules: "255,181,71", proposal: "255,77,109", pending: "255,159,67",
+    rules: "255,181,71", proposal: "255,77,109", pending: "255,159,67", meme: "199,125,255",
   };
   const graph = { nodes: [], links: [], byId: new Map(), alpha: 1, hover: null, selected: null, onSelect: null };
   const gcam = { yaw: 0.4, pitch: 0.35, dist: 22, dragging: false, lastX: 0, lastY: 0, idleAt: 0, targetYaw: null };

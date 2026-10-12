@@ -54,6 +54,16 @@ SQL = {
                       "from v_forecast_skill where model = 'timesfm-3.0' and symbol is null and horizon_days is not null "
                       "order by horizon_days",
     "equity": "select observed_at, balances from portfolio_snapshots order by observed_at limit 2000",
+    # Radar de memecoins: investigación, no recomendación. Nombres y símbolos los escribe cualquiera: el panel los
+    # pinta como texto, nunca como HTML.
+    "meme_board": "select mint, symbol, name, observed_at, pair_created_at, price_usd, market_cap_usd, liquidity_usd, "
+                  "volume_h1, buys_h1, sells_h1, price_change_h1, price_change_h24, holders, top10_pct, mint_revoked, "
+                  "freeze_revoked, lp_locked_pct, insider_networks, insider_wallets, insider_supply_pct, mentions_6h, "
+                  "attention_score, risk_score, flags, links from v_meme_board order by attention_score desc limit 12",
+    "meme_alerts": "select a.mint, s.symbol, a.alerted_at, a.price_usd, a.attention_score, a.risk_score, a.reason, "
+                   "a.scorer_version from meme_alerts a join meme_snapshots s on s.id = a.snapshot_id "
+                   "order by a.alerted_at desc limit 8",
+    "meme_skill": "select * from v_meme_alert_skill order by scorer_version desc, horizon_hours",
     "team": "select member_id, display_name, active, role, steps_done, joined_at from v_team_roster "
             "order by joined_at nulls last",
     "timeline": "select * from ("
@@ -136,6 +146,7 @@ def build_state(run_query, now):
         "rwa": q["rwa"],
         "equity": equity_curve(q["equity"]),
         "team": q["team"],
+        "memes": {"board": q["meme_board"], "alerts": q["meme_alerts"], "skill": q["meme_skill"]},
         "timeline": q["timeline"],
     }
     return to_jsonable(state)

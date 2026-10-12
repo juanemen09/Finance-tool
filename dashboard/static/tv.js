@@ -201,6 +201,59 @@
     };
   }
 
+  // Radar de memecoins de Solana (tools/meme_radar.py, cada 15 min): atención frente a riesgo en cadena e insiders.
+  // Los nombres los escribe cualquiera: van con textContent como todo lo demás.
+  const usd = (v) => v === null || v === undefined ? "—" : v >= 1e6 ? `${num(v / 1e6, 1)} M` : v >= 1e3 ? `${num(v / 1e3, 0)} k` : num(v, 0);
+  const age = (iso) => {
+    if (!iso) return "—";
+    const hrs = (Date.now() - new Date(iso).getTime()) / 3_600_000;
+    return hrs < 1 ? `${Math.round(hrs * 60)} min` : hrs < 48 ? `${Math.round(hrs)} h` : `${Math.round(hrs / 24)} d`;
+  };
+  const riskBadge = (r) => badge(`${Math.round(r)}`, r <= 30 ? "ok" : r <= 60 ? "mid" : "bad");
+
+  function secMemes() {
+    const m = state.memes || { board: [], alerts: [], skill: [] };
+    const rows = (m.board || []).slice(0, 9).map((t) => {
+      const tx = (t.buys_h1 || 0) + (t.sells_h1 || 0);
+      return h("tr", {}, h("td", {}, h("b", { text: (t.symbol || "?").slice(0, 12) })),
+        h("td", { class: "num", text: age(t.pair_created_at) }),
+        h("td", { class: "num", text: usd(t.market_cap_usd) }),
+        h("td", { class: "num", text: usd(t.liquidity_usd) }),
+        h("td", { class: "num", text: usd(t.volume_h1) }),
+        h("td", { class: "num", text: tx ? `${Math.round((t.buys_h1 || 0) / tx * 100)} %` : "—" }),
+        h("td", { class: `num ${tone(t.price_change_h1)}`, text: t.price_change_h1 == null ? "—" : `${signed(t.price_change_h1, 0)} %` }),
+        h("td", {}, bar((t.attention_score || 0) / 100, t.attention_score >= 60 ? "hot" : "")),
+        h("td", { class: "num" }, riskBadge(t.risk_score || 0)),
+        h("td", { class: "num", text: t.insider_supply_pct == null ? "—" : `${num(t.insider_supply_pct, 0)} %` }));
+    });
+    const top = (m.board || []).slice(0, 3);
+    const skill = (m.skill || []).filter((x) => x.scorer_version === (m.skill[0] || {}).scorer_version);
+    return {
+      title: "Memecoins · radar de Solana", sub: "atención contra riesgo en cadena e insiders · investigación, no recomendación",
+      body: [rows.length ? h("table", { class: "t" },
+        h("tr", {}, h("th", { text: "" }), h("th", { class: "num", text: "Edad" }), h("th", { class: "num", text: "Capitaliz." }),
+          h("th", { class: "num", text: "Liquidez" }), h("th", { class: "num", text: "Vol 1 h" }), h("th", { class: "num", text: "Compras" }),
+          h("th", { class: "num", text: "1 h" }), h("th", { text: "Atención" }), h("th", { class: "num", text: "Riesgo" }),
+          h("th", { class: "num", text: "Insiders" })), rows) : empty("El radar corre cada 15 minutos: todavía no hay fichas."),
+      h("div", { class: "grid-3 stagger" },
+        h("div", { class: "tile" }, h("h3", { text: "Banderas de los más mirados" }),
+          top.length ? h("ul", { class: "list" }, top.map((t) => h("li", {}, h("b", { text: `${(t.symbol || "?").slice(0, 12)} ` }),
+            h("span", { class: "sub", text: (t.flags || []).slice(0, 3).join(" · ") || "sin banderas" })))) : empty("—")),
+        h("div", { class: "tile" }, h("h3", { text: "Alertas" }),
+          (m.alerts || []).length ? h("ul", { class: "list" }, m.alerts.slice(0, 4).map((a) => h("li", {},
+            h("b", { text: `${(a.symbol || "?").slice(0, 12)} ` }), h("span", { class: "sub", text: `${ago(a.alerted_at)} · atención ${Math.round(a.attention_score)} · riesgo ${Math.round(a.risk_score)}` }))))
+            : empty("Sin alertas: nada con mucha atención y seguridad limpia.")),
+        h("div", { class: "tile" }, h("h3", { text: "¿Acierta el radar?" }),
+          skill.length ? h("table", { class: "t" }, h("tr", {}, h("th", { text: "" }), h("th", { class: "num", text: "n" }),
+            h("th", { class: "num", text: "Mediana" }), h("th", { class: "num", text: "Suben" }), h("th", { class: "num", text: "Se hunden" })),
+            skill.map((x) => h("tr", {}, h("td", { text: x.horizon_hours === 168 ? "7 d" : `${x.horizon_hours} h` }), h("td", { class: "num", text: String(x.scored) }),
+              h("td", { class: `num ${tone(x.median_return_pct)}`, text: `${signed(x.median_return_pct, 0)} %` }),
+              h("td", { class: "num", text: pct(x.hit_rate, 0) }), h("td", { class: "num", text: pct(x.crash_rate, 0) }))))
+            : empty("Cada alerta se mide a 1 h, 24 h y 7 días. Aún no venció ninguna."))),
+      h("p", { class: "sub", text: "Copia siempre la dirección del contrato: los nombres se clonan. Nadie toca tu billetera; tú decides." })],
+    };
+  }
+
   function secAgents() {
     const score = Object.fromEntries((state.scoreboard || []).map((s) => [s.agent_id, s]));
     const sa = state.standing_authorization || {}, limits = state.risk_limits || {};
@@ -497,7 +550,7 @@
   }
 
   const SECTIONS = [
-    ["Mercado", secMarket], ["Hora", secHour], ["Agentes", secAgents], ["Estrategias", secStrategies], ["TimesFM", secForecast],
+    ["Mercado", secMarket], ["Hora", secHour], ["Memecoins", secMemes], ["Agentes", secAgents], ["Estrategias", secStrategies], ["TimesFM", secForecast],
     ["Predicciones", secPredictions], ["Tesis IA", secThesis], ["Sentimiento", secSentiment], ["Money Printer", secMoney], ["Zyneath", secZyneath], ["Equipo", secTeam],
   ];
 
@@ -716,12 +769,12 @@
     hub: "Centro", agent: "Agente al día", alert: "Alerta o agente atrasado", market: "Mercado", asset: "Activo",
     hot: "Activo cerca de la compra", strategy: "Estrategia", rejected: "Estrategias rechazadas", research: "Investigación",
     forecast: "Pronóstico", sentiment: "Sentimiento", project: "Proyecto", person: "Persona", money: "Money Printer",
-    zyneath: "Zyneath", rules: "Reglas de riesgo", proposal: "Propuesta o posición", pending: "Pendiente del equipo",
+    zyneath: "Zyneath", rules: "Reglas de riesgo", proposal: "Propuesta o posición", pending: "Pendiente del equipo", meme: "Memecoin",
   };
   const GROUP_COLORS = {
     hub: "#ff4d6d", agent: "#45e0b0", alert: "#ff4d6d", market: "#6fd3ff", asset: "#6fd3ff", hot: "#ffb547",
     strategy: "#aa8cff", rejected: "#786ea0", research: "#ffd66e", forecast: "#78e6ff", sentiment: "#d2a0ff",
-    project: "#5a96ff", person: "#ebf0ff", money: "#50e68c", zyneath: "#ff82c8", rules: "#ffb547", proposal: "#ff4d6d", pending: "#ff9f43",
+    project: "#5a96ff", person: "#ebf0ff", money: "#50e68c", zyneath: "#ff82c8", rules: "#ffb547", proposal: "#ff4d6d", pending: "#ff9f43", meme: "#c77dff",
   };
   let graphOn = false, graphTourAt = 0, graphTourIdx = 0, graphNodes = new Map();
 
@@ -821,6 +874,20 @@
       link("hour", "sent", "tono FinBERT", 0.6);
       link("ag:claude", "hour", "lee a los 05", 0.6);
       link("ag:chatgpt", "hour", "lee a los 15", 0.6);
+    }
+    const memes = state.memes?.board || [];
+    if (memes.length) {
+      const al = state.memes.alerts || [];
+      add("memes", "Radar memecoins", "meme", 1.3, [`${memes.length} tokens vistos en 6 h`, al.length ? `Última alerta: ${al[0].symbol} (${ago(al[0].alerted_at)})` : "Sin alertas",
+        "Atención contra riesgo en cadena e insiders · investigación"]);
+      link("lab", "memes", "vigila", 0.6);
+      link("ag:claude", "memes", "avisa por correo", 0.4);
+      for (const t of memes.slice(0, 5)) {
+        add(`mm:${t.mint}`, (t.symbol || "?").slice(0, 12), t.risk_score <= 30 ? "meme" : "alert", 0.6 + (t.attention_score || 0) / 120,
+          [`Atención ${Math.round(t.attention_score)} · riesgo ${Math.round(t.risk_score)}`, `Capitalización ${usd(t.market_cap_usd)} USD · liquidez ${usd(t.liquidity_usd)}`,
+            ...(t.flags || []).slice(0, 3)]);
+        link("memes", `mm:${t.mint}`, "detecta", 0.5);
+      }
     }
     const th = state.ai_thesis || {};
     add("thesis", "Tesis IA", "research", 1.3, [th.AI_BOTTLENECK ? th.AI_BOTTLENECK.title : "Informe mensual del día 25", "13F de Situational Awareness, capex y oferta física"]);
